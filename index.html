@@ -121,7 +121,7 @@
   .settings-panel { display: none; background: var(--card); border: 2px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
   .settings-panel.open { display: block; }
   .settings-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 18px; font-weight: 700; }
-  input[type=number] { width: 120px; height: 50px; border-radius: 10px; border: 2px solid var(--border-strong); background: var(--bg); color: var(--text); font-size: 22px; font-weight: 800; padding: 0 10px; text-align: right; }
+  input[type=number] { width: 120px; height: 50px; border-radius: 10px; border: 2px solid var(--border-strong); background: var(--bg); color: var(--text); font-size: 20px; font-weight: 800; padding: 0 10px; text-align: center; }
   
   .card { background: var(--card); border: 2px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 14px; }
   
@@ -143,19 +143,31 @@
   .hist-summary-bar { font-size: 17px; color: var(--text-2); margin-bottom: 16px; display: flex; gap: 14px; font-weight: 700; }
   
   .hist-sublist-container { background: var(--bg); border-radius: 14px; padding: 14px; margin-bottom: 18px; display: flex; flex-direction: column; gap: 12px; }
-  .hist-sub-card { background: var(--card); border: 2px solid var(--border); border-radius: 12px; padding: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .hist-sub-card { background: var(--card); border: 2px solid var(--border); border-radius: 12px; padding: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
   
   .hist-sub-left { display: flex; flex-direction: column; gap: 6px; }
   .hist-sub-tag { font-size: 17px; font-weight: 800; color: var(--text); }
   .hist-sub-time { font-size: 16px; color: var(--text-2); font-variant-numeric: tabular-nums; font-weight: 700; }
   
-  .hist-sub-right { display: flex; align-items: center; gap: 16px; }
+  .hist-sub-right { display: flex; align-items: center; gap: 14px; }
   .hist-sub-metric { text-align: right; display: flex; flex-direction: column; gap: 4px; }
   .sub-metric-mins { font-size: 15px; color: var(--text-2); font-weight: 700; }
   .sub-metric-amt { font-size: 20px; font-weight: 900; color: var(--accent); }
   
-  .btn-del-suborder { background: var(--danger-bg); color: var(--danger); border: none; border-radius: 10px; padding: 10px 14px; font-size: 15px; font-weight: 800; }
+  .btn-action-sub { background: var(--card); border: 2px solid var(--border-strong); border-radius: 10px; padding: 8px 12px; font-size: 14px; font-weight: 800; color: var(--text); }
+  .btn-action-sub:active { background: var(--accent-bg); color: var(--accent-text); }
+
+  .btn-del-suborder { background: var(--danger-bg); color: var(--danger); border: none; border-radius: 10px; padding: 8px 12px; font-size: 14px; font-weight: 800; }
   .btn-del-suborder:active { opacity: 0.8; }
+
+  /* 數字微調編輯區塊 */
+  .sub-edit-box { width: 100%; background: var(--card); border: 2px dashed var(--accent); border-radius: 10px; padding: 14px; margin-top: 8px; display: flex; flex-direction: column; gap: 12px; font-size: 16px; font-weight: 700; }
+  .sub-edit-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .time-inputs-group { display: flex; align-items: center; gap: 6px; }
+  .time-num-input { width: 68px; height: 44px; text-align: center; font-size: 20px; font-weight: 900; border-radius: 8px; border: 2px solid var(--border-strong); background: var(--bg); color: var(--text); }
+  .sub-edit-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+  .btn-save-sub { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 15px; font-weight: 800; }
+  .btn-cancel-sub { background: var(--bg); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 16px; font-size: 15px; font-weight: 800; }
 
   .hist-mid { display: flex; justify-content: space-between; align-items: center; border-top: 2px solid var(--border); padding-top: 16px; }
   .guarantee { font-size: 17px; color: var(--text-2); display: flex; flex-direction: column; gap: 6px; font-weight: 700; }
@@ -245,7 +257,7 @@
   let activeTimers = [];
   let timerCounter = 0;
   let history = [];
-  let sortOrder = 'desc'; // 每次重整固定預設為新到舊
+  let sortOrder = 'desc'; 
   let tickHandle = null;
 
   const timersContainer = document.getElementById('timers-container');
@@ -258,13 +270,11 @@
   const themeBtn = document.getElementById('theme-toggle-btn');
   const sortToggleBtn = document.getElementById('sort-toggle-btn');
 
-  // 更新排序按鈕文字
   const updateSortBtnText = () => {
     sortToggleBtn.textContent = sortOrder === 'desc' ? '排序：新到舊 ▾' : '排序：舊到新 ▴';
   };
   updateSortBtnText();
 
-  // 排序切換事件（僅當次生效，不存入 localStorage）
   sortToggleBtn.addEventListener('click', () => {
     sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
     updateSortBtnText();
@@ -272,10 +282,8 @@
     renderHistory();
   });
 
-  // 主題切換按鈕邏輯（支援：系統預設 ➔ 淺色 ➔ 深色 迴圈）
   themeBtn.addEventListener('click', () => {
     const currentTheme = localStorage.getItem(STORE_THEME);
-    
     let nextTheme;
     if (currentTheme === null) {
       nextTheme = 'light';
@@ -356,6 +364,22 @@
     return false;
   };
 
+  const recalculateTrip = item => {
+    item.orders.forEach((ord, idx) => {
+      if (idx === 0) {
+        item.startTs = ord.startTs;
+      }
+      const diffSec = Math.max(0, Math.floor((ord.endTs - ord.startTs) / 1000));
+      const g = computeGuarantee(diffSec);
+      ord.mins = g.mins;
+      ord.guaranteed = g.amt;
+    });
+
+    item.endTs = item.orders[item.orders.length - 1].endTs;
+    item.mins = Math.max(1, Math.round((item.endTs - item.startTs) / 60000));
+    item.guaranteed = item.orders.reduce((sum, ord) => sum + ord.guaranteed, 0);
+  };
+
   const updateHistoryLabels = () => {
     const dateKeys = [...new Set(history.map(h => fmtDate(h.startTs)))];
     
@@ -387,7 +411,7 @@
     if (h) {
       history = JSON.parse(h);
       history.forEach(item => {
-        item.mins = Math.max(1, Math.round((item.endTs - item.startTs) / 60000));
+        recalculateTrip(item);
       });
       updateHistoryLabels();
       saveHistory(); 
@@ -549,10 +573,7 @@
     item.orders.splice(orderIndex, 1);
     item.orders.forEach((ord, idx) => ord.orderNum = idx + 1);
 
-    item.guaranteed = item.orders.reduce((sum, ord) => sum + ord.guaranteed, 0);
-    item.endTs = item.orders[item.orders.length - 1].endTs;
-    item.mins = Math.max(1, Math.round((item.endTs - item.startTs) / 60000));
-
+    recalculateTrip(item);
     updateHistoryLabels(); 
     saveHistory();
     renderHistory();
@@ -626,9 +647,7 @@
     
     activeTimers.forEach(timer => {
       const now = Date.now();
-      
       const totalDiffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
-      
       const currentDiffSec = Math.floor((now - timer.currentOrderStartTs) / 1000);
       const currentG = computeGuarantee(currentDiffSec);
       const stackedGuaranteed = timer.orders.reduce((sum, ord) => sum + ord.guaranteed, 0);
@@ -720,7 +739,6 @@
       const now = Date.now();
       
       const totalDiffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
-      
       const currentDiffSec = Math.floor((now - timer.currentOrderStartTs) / 1000);
       const currentG = computeGuarantee(currentDiffSec);
       const stackedGuaranteed = timer.orders.reduce((sum, ord) => sum + ord.guaranteed, 0);
@@ -838,7 +856,7 @@
         if (h.orders && h.orders.length > 0) {
           h.orders.forEach((o, oIdx) => {
             subCardsHtml += `
-              <div class="hist-sub-card">
+              <div class="hist-sub-card" data-sub-container="${h.id}_${oIdx}">
                 <div class="hist-sub-left">
                   <span class="hist-sub-tag">第 ${o.orderNum} 單</span>
                   <span class="hist-sub-time">${fmtTime(o.startTs)} – ${fmtTime(o.endTs)}</span>
@@ -848,7 +866,8 @@
                     <span class="sub-metric-mins">${o.mins} 分鐘</span>
                     <span class="sub-metric-amt">+$${o.guaranteed}</span>
                   </div>
-                  ${h.orders.length > 1 ? `<button class="btn-del-suborder" data-hid="${h.id}" data-oidx="${oIdx}">刪除此單</button>` : ''}
+                  <button class="btn-action-sub btn-edit-sub" data-hid="${h.id}" data-oidx="${oIdx}">修改</button>
+                  ${h.orders.length > 1 ? `<button class="btn-del-suborder" data-hid="${h.id}" data-oidx="${oIdx}">刪除</button>` : ''}
                 </div>
               </div>
             `;
@@ -895,6 +914,86 @@
         
         el.querySelector('.btn-hist-x').addEventListener('click', ev => {
           deleteHistory(ev.target.getAttribute('data-id'));
+        });
+
+        // 綁定「修改」按鈕事件（使用純數字輸入時 / 分）
+        el.querySelectorAll('.btn-edit-sub').forEach(editBtn => {
+          editBtn.addEventListener('click', ev => {
+            const hid = ev.target.getAttribute('data-hid');
+            const oidx = parseInt(ev.target.getAttribute('data-oidx'), 10);
+            const item = history.find(x => x.id === hid);
+            const ord = item.orders[oidx];
+
+            const subCardEl = el.querySelector(`[data-sub-container="${hid}_${oidx}"]`);
+            if (subCardEl.querySelector('.sub-edit-box')) return;
+
+            const startDate = new Date(ord.startTs);
+            const endDate = new Date(ord.endTs);
+
+            const editBox = document.createElement('div');
+            editBox.className = 'sub-edit-box';
+            editBox.innerHTML = `
+              <div class="sub-edit-row">
+                <span>開始時間：</span>
+                <div class="time-inputs-group">
+                  <input type="number" class="time-num-input edit-start-h" value="${startDate.getHours()}" min="0" max="23" placeholder="時">
+                  <span>:</span>
+                  <input type="number" class="time-num-input edit-start-m" value="${startDate.getMinutes()}" min="0" max="59" placeholder="分">
+                </div>
+              </div>
+              <div class="sub-edit-row">
+                <span>結束時間：</span>
+                <div class="time-inputs-group">
+                  <input type="number" class="time-num-input edit-end-h" value="${endDate.getHours()}" min="0" max="23" placeholder="時">
+                  <span>:</span>
+                  <input type="number" class="time-num-input edit-end-m" value="${endDate.getMinutes()}" min="0" max="59" placeholder="分">
+                </div>
+              </div>
+              <div class="sub-edit-btns">
+                <button class="btn-cancel-sub">取消</button>
+                <button class="btn-save-sub">確定修改</button>
+              </div>
+            `;
+            subCardEl.appendChild(editBox);
+
+            editBox.querySelector('.btn-cancel-sub').addEventListener('click', () => {
+              editBox.remove();
+            });
+
+            editBox.querySelector('.btn-save-sub').addEventListener('click', () => {
+              const startH = parseInt(editBox.querySelector('.edit-start-h').value, 10);
+              const startM = parseInt(editBox.querySelector('.edit-start-m').value, 10);
+              const endH = parseInt(editBox.querySelector('.edit-end-h').value, 10);
+              const endM = parseInt(editBox.querySelector('.edit-end-m').value, 10);
+
+              if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) {
+                alert('請完整填寫數字');
+                return;
+              }
+
+              if (startH < 0 || startH > 23 || startM < 0 || startM > 59 || endH < 0 || endH > 23 || endM < 0 || endM > 59) {
+                alert('時間數值超出範圍（時 0-23，分 0-59）');
+                return;
+              }
+
+              const baseDate = new Date(ord.startTs);
+              const newStartTs = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), startH, startM).getTime();
+              const newEndTs = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), endH, endM).getTime();
+
+              if (newEndTs <= newStartTs) {
+                alert('結束時間必須大於開始時間！');
+                return;
+              }
+
+              ord.startTs = newStartTs;
+              ord.endTs = newEndTs;
+
+              recalculateTrip(item);
+              updateHistoryLabels();
+              saveHistory();
+              renderHistory();
+            });
+          });
         });
 
         el.querySelectorAll('.btn-del-suborder').forEach(subBtn => {
