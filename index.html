@@ -3,7 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>夾單計時 / 保障試算</title>
+<title>外送計時器 / 最低保障收入計算器</title>
+<link rel="icon" type="image/png" href="favicon-96x96.png" sizes="96x96" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="shortcut icon" href="favicon.ico" />
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+<link rel="manifest" href="site.webmanifest" />
 <script>
   // 優先在畫面渲染前讀取主題，避免閃爍
   const savedTheme = localStorage.getItem('delivery-tracker:theme');
@@ -128,8 +133,6 @@
   .date-section { margin-bottom: 32px; }
   .date-header { display: flex; justify-content: space-between; align-items: flex-end; margin: 32px 0 12px 4px; padding-bottom: 10px; border-bottom: 3px solid var(--border-strong); }
   .date-header .d-title { font-size: 22px; font-weight: 800; color: var(--text); }
-  .btn-del-date { background: none; border: none; color: var(--text-3); font-size: 17px; padding: 8px; font-weight: 700; }
-  .btn-del-date:active { color: var(--danger); }
   
   .date-summary-box { background: var(--card); border: 2px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; display: flex; flex-direction: column; font-weight: 700; }
 
@@ -197,18 +200,18 @@
 <div class="wrap">
   <button id="theme-toggle-btn" class="theme-toggle-btn" title="切換深淺色模式">🌓</button>
 
-  <h1>夾單計時 / 保障試算</h1>
-  <p class="sub">計算公式：各單獨立計算 max(服務分鐘 × 時薪 × 1.25 / 60, 45元)</p>
+  <h1>外送計時器 / 最低保障收入計算器</h1>
+  <p class="sub">計算方式：各單獨立計算，服務分鐘 × 時薪 × 1.25 / 60，最低 45 元</p>
   
   <details class="guide-dropdown">
     <summary>💡 使用須知與夾單說明 <span>▾</span></summary>
     <div class="guide-content">
-      若為同時接獲的多筆訂單，請使用「完送此單並夾單」來分開計算各單送達時間；若為行程中額外新派發的獨立夾單，則建議透過「＋ 新接單」另外建立獨立計時器。
+      若為同時接獲的多筆訂單，請使用「完送此單並夾單」來分開計算各單送達時間；若為行程中額外新派發的獨立夾單，則建議透過 "＋ 新接單" 另外建立獨立計時器。
     </div>
   </details>
 
   <div class="notice-banner">
-    提醒：本工具資料僅存於本機瀏覽器，不保證紀錄能夠永久儲存。建議每日都使用輸出成CSV檔的功能將數據輸出成檔案，然後刪除該日記錄，以維持本app在你的手機上的穩定運作。
+    提醒：本工具資料僅存於本機瀏覽器，不保證紀錄能夠永久儲存。建議每日都將記錄輸出成CSV檔後刪除該日記錄，以維持本app在你的手機上的穩定運作。
   </div>
 
   <button class="btn-add-timer" id="create-timer-btn">＋ 新接單</button>
@@ -234,7 +237,7 @@
   <div id="history-list"></div>
   
   <div id="clear-all-wrap" style="display:none;">
-    <button class="btn-danger-outline" id="clear-all-btn">清空所有紀錄（匯出或抄錄後點擊）</button>
+    <button class="btn-danger-outline" id="clear-all-btn">清空所有紀錄</button>
   </div>
 
   <div class="footer-section">
@@ -365,17 +368,21 @@
   };
 
   const recalculateTrip = item => {
-    item.orders.forEach((ord, idx) => {
-      if (idx === 0) {
-        item.startTs = ord.startTs;
-      }
+    if (!item.orders || item.orders.length === 0) return;
+
+    const tripStartTs = Math.min(...item.orders.map(o => o.startTs));
+    item.startTs = tripStartTs;
+
+    item.orders.forEach((ord) => {
+      ord.startTs = tripStartTs;
+
       const diffSec = Math.max(0, Math.floor((ord.endTs - ord.startTs) / 1000));
       const g = computeGuarantee(diffSec);
       ord.mins = g.mins;
       ord.guaranteed = g.amt;
     });
 
-    item.endTs = item.orders[item.orders.length - 1].endTs;
+    item.endTs = Math.max(...item.orders.map(o => o.endTs));
     item.mins = Math.max(1, Math.round((item.endTs - item.startTs) / 60000));
     item.guaranteed = item.orders.reduce((sum, ord) => sum + ord.guaranteed, 0);
   };
@@ -457,7 +464,6 @@
       id: `t_${now}_${tempCounter}`,
       name: `新趟次 #${tempCounter}`, 
       firstOrderStartTs: now,      
-      currentOrderStartTs: now,    
       orders: []
     };
     activeTimers.push(timerObj);
@@ -479,19 +485,17 @@
     if (!timer) return;
     
     const now = Date.now();
-    const diffSec = Math.floor((now - timer.currentOrderStartTs) / 1000);
+    const diffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
     const g = computeGuarantee(diffSec);
     const orderNum = timer.orders.length + 1;
     
     timer.orders.push({
       orderNum,
-      startTs: timer.currentOrderStartTs, 
+      startTs: timer.firstOrderStartTs, 
       endTs: now,
       mins: g.mins,
       guaranteed: g.amt
     });
-
-    timer.currentOrderStartTs = now; 
 
     saveActiveTimers(); 
     renderTimers();
@@ -503,10 +507,6 @@
     if (!timer || timer.orders.length === 0) return;
     
     timer.orders.pop();
-    
-    timer.currentOrderStartTs = timer.orders.length > 0 
-      ? timer.orders[timer.orders.length - 1].endTs 
-      : timer.firstOrderStartTs;
 
     saveActiveTimers();
     renderTimers();
@@ -518,13 +518,13 @@
     const timer = activeTimers[idx];
     const now = Date.now();
 
-    const diffSec = Math.floor((now - timer.currentOrderStartTs) / 1000);
+    const diffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
     const g = computeGuarantee(diffSec);
     const finalOrderNum = timer.orders.length + 1;
     
     const allOrders = [...timer.orders, {
       orderNum: finalOrderNum,
-      startTs: timer.currentOrderStartTs, 
+      startTs: timer.firstOrderStartTs, 
       endTs: now,
       mins: g.mins,
       guaranteed: g.amt
@@ -648,7 +648,7 @@
     activeTimers.forEach(timer => {
       const now = Date.now();
       const totalDiffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
-      const currentDiffSec = Math.floor((now - timer.currentOrderStartTs) / 1000);
+      const currentDiffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
       const currentG = computeGuarantee(currentDiffSec);
       const stackedGuaranteed = timer.orders.reduce((sum, ord) => sum + ord.guaranteed, 0);
       const totalGuaranteeVisual = stackedGuaranteed + currentG.amt;
@@ -739,7 +739,7 @@
       const now = Date.now();
       
       const totalDiffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
-      const currentDiffSec = Math.floor((now - timer.currentOrderStartTs) / 1000);
+      const currentDiffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
       const currentG = computeGuarantee(currentDiffSec);
       const stackedGuaranteed = timer.orders.reduce((sum, ord) => sum + ord.guaranteed, 0);
       const totalGuaranteeVisual = stackedGuaranteed + currentG.amt;
@@ -809,7 +809,7 @@
         <span class="d-title">${dateStr}</span>
         <div style="display:flex; gap:8px; align-items:center;">
           <button class="btn-export-csv" data-date="${dateStr}" style="background:var(--accent-bg); color:var(--accent-text); border:1px solid var(--accent); border-radius:8px; padding:6px 12px; font-size:15px; font-weight:750; cursor:pointer;">📥 匯出本日 CSV</button>
-          <button class="btn-del-date" data-date="${dateStr}">刪除此日</button>
+          <button class="btn-del-date" data-date="${dateStr}" style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger); border-radius:8px; padding:6px 12px; font-size:15px; font-weight:750; cursor:pointer;">🗑️ 刪除本日記錄</button>
         </div>
       `;
       dateSection.appendChild(headerEl);
@@ -916,7 +916,7 @@
           deleteHistory(ev.target.getAttribute('data-id'));
         });
 
-        // 綁定「修改」按鈕事件（使用純數字輸入時 / 分）
+        // 綁定「修改」按鈕事件
         el.querySelectorAll('.btn-edit-sub').forEach(editBtn => {
           editBtn.addEventListener('click', ev => {
             const hid = ev.target.getAttribute('data-hid');
