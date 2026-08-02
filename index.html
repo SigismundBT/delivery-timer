@@ -236,6 +236,9 @@
   .btn-del-suborder { background: var(--danger-bg); color: var(--danger); border: none; border-radius: 10px; padding: 8px 12px; font-size: 14px; font-weight: 800; }
   .btn-del-suborder:active { opacity: 0.8; }
 
+  .btn-add-suborder { width: 100%; padding: 12px; background: var(--card); border: 2px dashed var(--border-strong); border-radius: 12px; font-size: 16px; font-weight: 800; color: var(--accent); margin-top: 4px; transition: 0.2s; }
+  .btn-add-suborder:active { background: var(--accent-bg); border-color: var(--accent); }
+
   /* 數字微調編輯區塊 */
   .sub-edit-box { width: 100%; background: var(--card); border: 2px dashed var(--accent); border-radius: 10px; padding: 14px; margin-top: 8px; display: flex; flex-direction: column; gap: 12px; font-size: 16px; font-weight: 700; }
   .sub-edit-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -645,6 +648,28 @@
     renderHistory();
   };
   
+  const addSubOrder = (histId) => {
+    const item = history.find(h => h.id === histId);
+    if (!item) return;
+
+    const lastOrder = item.orders[item.orders.length - 1];
+    const defaultEndTs = lastOrder ? lastOrder.endTs : Date.now();
+    const newOrderNum = item.orders.length + 1;
+
+    item.orders.push({
+      orderNum: newOrderNum,
+      startTs: item.startTs,
+      endTs: defaultEndTs,
+      mins: 1,
+      guaranteed: 45
+    });
+
+    recalculateTrip(item);
+    updateHistoryLabels();
+    saveHistory();
+    renderHistory();
+  };
+
   const deleteSubOrder = (histId, orderIndex) => {
     if (!window.confirm('確定要移除這筆夾單紀錄嗎？\n移除後將自動重新計算整趟總保障。')) return;
     const item = history.find(h => h.id === histId);
@@ -967,6 +992,7 @@
           </div>
           <div class="hist-sublist-container">
             ${subCardsHtml}
+            <button class="btn-add-suborder" data-hid="${h.id}">＋ 追加夾單</button>
           </div>
           <div class="hist-mid">
             <div class="guarantee">
@@ -997,6 +1023,11 @@
         
         el.querySelector('.btn-hist-x').addEventListener('click', ev => {
           deleteHistory(ev.target.getAttribute('data-id'));
+        });
+
+        el.querySelector('.btn-add-suborder').addEventListener('click', ev => {
+          const hid = ev.target.getAttribute('data-hid');
+          addSubOrder(hid);
         });
 
         // 綁定「修改」按鈕事件
