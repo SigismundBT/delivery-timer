@@ -86,7 +86,80 @@
   .guide-dropdown summary::-webkit-details-marker { display: none; }
   .guide-content { padding: 0 16px 16px; font-size: 16px; color: var(--text-2); line-height: 1.6; border-top: 1px solid var(--border); padding-top: 12px; font-weight: 600; }
 
-  .notice-banner { background: var(--amber-bg); color: var(--amber); border: 2px solid var(--amber); border-radius: 12px; padding: 14px 16px; font-size: 16px; line-height: 1.5; margin-bottom: 24px; font-weight: 700; }
+/* ==========================================
+   Notice Banner (預設/Light Mode)
+   ========================================== */
+.notice-banner {
+  background-color: #fff9e6;
+  border-left: 4px solid #ffc107;
+  color: #856404;
+  padding: 18px;             /* 稍微增加內距，讓大字體不擁擠 */
+  border-radius: 12px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  text-align: left;
+}
+
+.notice-banner .notice-title {
+  font-size: 19px;           /* 原本是 17px -> 改為 19px */
+  font-weight: 800;
+  margin-bottom: 10px;
+  color: #856404;
+}
+
+.notice-banner ul {
+  margin: 0;
+  padding-left: 22px;
+  line-height: 1.7;          /* 稍微加大行高提升閱讀感 */
+  font-size: 17px;           /* 原本是 15px -> 改為 17px (內文主體) */
+  color: #856404;
+}
+
+.notice-banner b {
+  color: #533f03;
+}
+
+.notice-banner .notice-footer {
+  font-size: 16px;           /* 原本是 14px -> 改為 16px (底部備註) */
+  margin-top: 12px;
+  opacity: 0.95;
+  font-weight: 600;
+  line-height: 1.6;
+  color: #856404;
+}
+
+  /* Notice Banner - Dark Mode (系統偵測 or 手動指定) */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .notice-banner {
+      background-color: #2a2415;
+      border-left: 4px solid #f39c12;
+      color: #e6c875;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    :root:not([data-theme="light"]) .notice-banner .notice-title,
+    :root:not([data-theme="light"]) .notice-banner b {
+      color: #fff0be;
+    }
+    :root:not([data-theme="light"]) .notice-banner ul,
+    :root:not([data-theme="light"]) .notice-banner .notice-footer {
+      color: #e6c875;
+    }
+  }
+
+  :root[data-theme="dark"] .notice-banner {
+    background-color: #2a2415;
+    border-left: 4px solid #f39c12;
+    color: #e6c875;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+  :root[data-theme="dark"] .notice-banner .notice-title,
+  :root[data-theme="dark"] .notice-banner b {
+    color: #fff0be;
+  }
+  :root[data-theme="dark"] .notice-banner ul,
+  :root[data-theme="dark"] .notice-banner .notice-footer {
+    color: #e6c875;
+  }
 
   button { font-family: inherit; -webkit-appearance: none; appearance: none; cursor: pointer; }
   
@@ -211,7 +284,17 @@
   </details>
 
   <div class="notice-banner">
-    提醒：本工具資料僅存於本機瀏覽器，不保證紀錄能夠永久儲存。建議每日都將記錄輸出成CSV檔後刪除該日記錄，以維持本app在你的手機上的穩定運作。
+    <div class="notice-title">⚠️ 使用與時間計算提醒</div>
+    <ul>
+      <li><b>工具定位：</b>本計時器僅作個人時間紀錄用。由於手動操作不可能與系統完全同步，實際總金額必定有些微差別。<b>建議當金額落差過大時，再來檢查是否需要跟平台反映。</b></li>
+      <li><b>資料儲存：</b>本工具資料僅存於你的手機瀏覽器，不保證紀錄能永久儲存。建議每日匯出 CSV 備份後刪除當日紀錄。</li>
+      <li><b>伺服器時差：</b>本工具以「你的裝置時間」為準，平台紀錄則以「平台伺服器時間」為準，兩者可能有些許時間差。</li>
+      <li><b>計算單位：</b>為保證數據穩定，本工具之服務時間<b>僅以「整數分鐘」為單位</b>進行估算（未滿 30 秒捨去，滿 30 秒進位）；而平台系統則是以「精確秒數」等比例計算。</li>
+      <li><b>免責聲明：</b>本工具僅供個人紀錄與試算參考，<b>不具備法律效力或官方約束力</b>。實際結算金額與外送服務時間仍以各外送平台官方系統最終發布之數據為準。</li>
+    </ul>
+    <div class="notice-footer">
+      ※ 綜合上述因素與手動點擊時間差，<b>單筆訂單</b>之計時結果與平台實際紀錄若有前後 1～2 分鐘落差，以及多單累積後的些許總額差異，皆屬正常現象。
+    </div>
   </div>
 
   <button class="btn-add-timer" id="create-timer-btn">＋ 新接單</button>
@@ -927,22 +1010,32 @@
             const subCardEl = el.querySelector(`[data-sub-container="${hid}_${oidx}"]`);
             if (subCardEl.querySelector('.sub-edit-box')) return;
 
-            const startDate = new Date(ord.startTs);
+            const startDate = new Date(item.startTs);
             const endDate = new Date(ord.endTs);
+            const isFirstOrder = (oidx === 0);
 
             const editBox = document.createElement('div');
             editBox.className = 'sub-edit-box';
-            editBox.innerHTML = `
+
+            const startRowHtml = isFirstOrder ? `
               <div class="sub-edit-row">
-                <span>開始時間：</span>
+                <span>整趟開始時間：</span>
                 <div class="time-inputs-group">
                   <input type="number" class="time-num-input edit-start-h" value="${startDate.getHours()}" min="0" max="23" placeholder="時">
                   <span>:</span>
                   <input type="number" class="time-num-input edit-start-m" value="${startDate.getMinutes()}" min="0" max="59" placeholder="分">
                 </div>
               </div>
+            ` : `
+              <div class="sub-edit-row" style="font-size:14px; color:var(--text-3);">
+                <span>整趟起點：${fmtTime(item.startTs)}（夾單共用，如需調整請至第 1 單）</span>
+              </div>
+            `;
+
+            editBox.innerHTML = `
+              ${startRowHtml}
               <div class="sub-edit-row">
-                <span>結束時間：</span>
+                <span>本單結束時間：</span>
                 <div class="time-inputs-group">
                   <input type="number" class="time-num-input edit-end-h" value="${endDate.getHours()}" min="0" max="23" placeholder="時">
                   <span>:</span>
@@ -961,31 +1054,47 @@
             });
 
             editBox.querySelector('.btn-save-sub').addEventListener('click', () => {
-              const startH = parseInt(editBox.querySelector('.edit-start-h').value, 10);
-              const startM = parseInt(editBox.querySelector('.edit-start-m').value, 10);
               const endH = parseInt(editBox.querySelector('.edit-end-h').value, 10);
               const endM = parseInt(editBox.querySelector('.edit-end-m').value, 10);
 
-              if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) {
-                alert('請完整填寫數字');
+              if (isNaN(endH) || isNaN(endM)) {
+                alert('請完整填寫時間數字');
                 return;
               }
 
-              if (startH < 0 || startH > 23 || startM < 0 || startM > 59 || endH < 0 || endH > 23 || endM < 0 || endM > 59) {
+              if (endH < 0 || endH > 23 || endM < 0 || endM > 59) {
                 alert('時間數值超出範圍（時 0-23，分 0-59）');
                 return;
               }
 
-              const baseDate = new Date(ord.startTs);
-              const newStartTs = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), startH, startM).getTime();
-              const newEndTs = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), endH, endM).getTime();
+              let newStartTs = item.startTs;
+
+              if (isFirstOrder) {
+                const startH = parseInt(editBox.querySelector('.edit-start-h').value, 10);
+                const startM = parseInt(editBox.querySelector('.edit-start-m').value, 10);
+
+                if (isNaN(startH) || isNaN(startM) || startH < 0 || startH > 23 || startM < 0 || startM > 59) {
+                  alert('開始時間數值不正確');
+                  return;
+                }
+
+                const baseStartDate = new Date(item.startTs);
+                newStartTs = new Date(baseStartDate.getFullYear(), baseStartDate.getMonth(), baseStartDate.getDate(), startH, startM).getTime();
+              }
+
+              const baseEndDate = new Date(ord.endTs);
+              const newEndTs = new Date(baseEndDate.getFullYear(), baseEndDate.getMonth(), baseEndDate.getDate(), endH, endM).getTime();
 
               if (newEndTs <= newStartTs) {
                 alert('結束時間必須大於開始時間！');
                 return;
               }
 
-              ord.startTs = newStartTs;
+              if (isFirstOrder) {
+                item.startTs = newStartTs;
+                item.orders.forEach(o => o.startTs = newStartTs);
+              }
+
               ord.endTs = newEndTs;
 
               recalculateTrip(item);
