@@ -279,12 +279,7 @@
   <h1>外送計時器 / 最低保障收入計算器</h1>
   <p class="sub">計算方式：各單獨立計算，服務分鐘 × 時薪 × 1.25 / 60，最低 45 元</p>
   
-  <details class="guide-dropdown">
-    <summary>💡 使用須知與夾單說明 <span>▾</span></summary>
-    <div class="guide-content">
-      若為同時接獲的多筆訂單，請使用「完送此單並夾單」來分開計算各單送達時間；若為行程中額外新派發的獨立夾單，則建議透過 "＋ 新接單" 另外建立獨立計時器。
-    </div>
-  </details>
+  <button class="btn-add-timer" id="create-timer-btn">＋ 新接單</button>
 
   <div class="notice-banner">
     <div class="notice-title">⚠️ 使用與時間計算提醒</div>
@@ -300,7 +295,12 @@
     </div>
   </div>
 
-  <button class="btn-add-timer" id="create-timer-btn">＋ 新接單</button>
+  <details class="guide-dropdown">
+    <summary>💡 使用須知與夾單說明 <span>▾</span></summary>
+    <div class="guide-content">
+      若為同時接獲的多筆訂單，請使用「完送此單並夾單」來分開計算各單送達時間；若為行程中額外新派發的獨立夾單，則建議透過 "＋ 新接單" 另外建立獨立計時器。
+    </div>
+  </details>
 
   <div id="timers-container"></div>
 
