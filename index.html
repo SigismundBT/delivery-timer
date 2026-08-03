@@ -15,7 +15,7 @@
   if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
 </script>
 <style>
-/* 預設 Light Mode 變數（同時作為系統 Light 或未設定時的基礎） */
+  /* 預設 Light Mode 變數 */
   :root {
     --bg: #F5F4F0; --card: #FFFFFF; --border: #E2E0D8; --border-strong: #C9C6BA;
     --text: #1F1E1B; --text-2: #55534B; --text-3: #8C897E;
@@ -26,7 +26,7 @@
     --radius: 16px;
   }
   
-  /* 系統預設 Dark Mode（當未手動指定時，隨系統自動切換） */
+  /* 系統預設 Dark Mode */
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]):not([data-theme="dark"]) {
       --bg: #171613; --card: #211F1C; --border: #332F29; --border-strong: #48423A;
@@ -61,9 +61,10 @@
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; transition: background 0.2s, color 0.2s; }
   
-  .wrap { position: relative; max-width: 500px; margin: 0 auto; padding: 20px 16px 100px; }
+  /* 預留底部 Nav 欄位的空間 (120px) */
+  .wrap { position: relative; max-width: 500px; margin: 0 auto; padding: 20px 16px 120px; }
   @media (min-width: 768px) {
-    .wrap { max-width: 720px; padding: 32px 24px 120px; }
+    .wrap { max-width: 720px; padding: 32px 24px 140px; }
   }
 
   /* 主題切換按鈕 */
@@ -81,85 +82,55 @@
   h1 { font-size: 26px; font-weight: 800; margin: 0 0 8px; }
   .sub { font-size: 17px; color: var(--text-2); margin: 0 0 16px; font-weight: 600; line-height: 1.4; }
   
+  /* 分頁切換區塊控制 */
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* 底部導覽列 (Bottom Navigation Bar) */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--card); border-top: 2px solid var(--border);
+    display: flex; justify-content: space-around; align-items: center;
+    height: 70px; z-index: 1000; box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
+  }
+  .bottom-nav-item {
+    flex: 1; height: 100%; background: none; border: none;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; color: var(--text-3); font-size: 14px; font-weight: 800;
+    transition: color 0.2s;
+  }
+  .bottom-nav-item .icon { font-size: 22px; }
+  .bottom-nav-item.active { color: var(--accent); }
+
   .guide-dropdown { background: var(--card); border: 2px solid var(--border-strong); border-radius: 12px; margin-bottom: 20px; font-weight: 700; overflow: hidden; }
   .guide-dropdown summary { padding: 14px 16px; font-size: 17px; color: var(--accent-text); cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; }
   .guide-dropdown summary::-webkit-details-marker { display: none; }
   .guide-content { padding: 0 16px 16px; font-size: 16px; color: var(--text-2); line-height: 1.6; border-top: 1px solid var(--border); padding-top: 12px; font-weight: 600; }
 
-/* ==========================================
-   Notice Banner (預設/Light Mode)
-   ========================================== */
-.notice-banner {
-  background-color: #fff9e6;
-  border-left: 4px solid #ffc107;
-  color: #856404;
-  padding: 18px;             /* 稍微增加內距，讓大字體不擁擠 */
-  border-radius: 12px;
-  margin-bottom: 24px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  text-align: left;
-}
+  /* Notice Banner */
+  .notice-banner {
+    background-color: #fff9e6; border-left: 4px solid #ffc107; color: #856404;
+    padding: 18px; border-radius: 12px; margin-bottom: 24px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); text-align: left;
+  }
+  .notice-banner .notice-title { font-size: 19px; font-weight: 800; margin-bottom: 10px; color: #856404; }
+  .notice-banner ul { margin: 0; padding-left: 22px; line-height: 1.7; font-size: 17px; color: #856404; }
+  .notice-banner b { color: #533f03; }
+  .notice-banner .notice-footer { font-size: 16px; margin-top: 12px; opacity: 0.95; font-weight: 600; line-height: 1.6; color: #856404; }
 
-.notice-banner .notice-title {
-  font-size: 19px;           /* 原本是 17px -> 改為 19px */
-  font-weight: 800;
-  margin-bottom: 10px;
-  color: #856404;
-}
-
-.notice-banner ul {
-  margin: 0;
-  padding-left: 22px;
-  line-height: 1.7;          /* 稍微加大行高提升閱讀感 */
-  font-size: 17px;           /* 原本是 15px -> 改為 17px (內文主體) */
-  color: #856404;
-}
-
-.notice-banner b {
-  color: #533f03;
-}
-
-.notice-banner .notice-footer {
-  font-size: 16px;           /* 原本是 14px -> 改為 16px (底部備註) */
-  margin-top: 12px;
-  opacity: 0.95;
-  font-weight: 600;
-  line-height: 1.6;
-  color: #856404;
-}
-
-  /* Notice Banner - Dark Mode (系統偵測 or 手動指定) */
+  /* Notice Banner Dark Mode */
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) .notice-banner {
-      background-color: #2a2415;
-      border-left: 4px solid #f39c12;
-      color: #e6c875;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    }
+    :root:not([data-theme="light"]) .notice-banner { background-color: #2a2415; border-left: 4px solid #f39c12; color: #e6c875; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); }
     :root:not([data-theme="light"]) .notice-banner .notice-title,
-    :root:not([data-theme="light"]) .notice-banner b {
-      color: #fff0be;
-    }
+    :root:not([data-theme="light"]) .notice-banner b { color: #fff0be; }
     :root:not([data-theme="light"]) .notice-banner ul,
-    :root:not([data-theme="light"]) .notice-banner .notice-footer {
-      color: #e6c875;
-    }
+    :root:not([data-theme="light"]) .notice-banner .notice-footer { color: #e6c875; }
   }
-
-  :root[data-theme="dark"] .notice-banner {
-    background-color: #2a2415;
-    border-left: 4px solid #f39c12;
-    color: #e6c875;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  }
+  :root[data-theme="dark"] .notice-banner { background-color: #2a2415; border-left: 4px solid #f39c12; color: #e6c875; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); }
   :root[data-theme="dark"] .notice-banner .notice-title,
-  :root[data-theme="dark"] .notice-banner b {
-    color: #fff0be;
-  }
+  :root[data-theme="dark"] .notice-banner b { color: #fff0be; }
   :root[data-theme="dark"] .notice-banner ul,
-  :root[data-theme="dark"] .notice-banner .notice-footer {
-    color: #e6c875;
-  }
+  :root[data-theme="dark"] .notice-banner .notice-footer { color: #e6c875; }
 
   button { font-family: inherit; -webkit-appearance: none; appearance: none; cursor: pointer; }
   
@@ -191,7 +162,7 @@
   .btn-half.finish { background: var(--danger-bg); border-color: var(--danger); color: var(--danger); }
   .btn-half:active { opacity: 0.8; }
 
-  .section-title { display: flex; align-items: center; justify-content: space-between; margin: 40px 0 14px; }
+  .section-title { display: flex; align-items: center; justify-content: space-between; margin: 10px 0 14px; }
   .section-title h2 { font-size: 22px; font-weight: 800; margin: 0; }
   .header-actions { display: flex; gap: 10px; align-items: center; }
   .link-btn { font-size: 17px; color: var(--text-2); background: none; border: none; padding: 8px; font-weight: 700; }
@@ -204,7 +175,7 @@
   .card { background: var(--card); border: 2px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 14px; }
   
   .date-section { margin-bottom: 32px; }
-  .date-header { display: flex; justify-content: space-between; align-items: flex-end; margin: 32px 0 12px 4px; padding-bottom: 10px; border-bottom: 3px solid var(--border-strong); }
+  .date-header { display: flex; justify-content: space-between; align-items: flex-end; margin: 20px 0 12px 4px; padding-bottom: 10px; border-bottom: 3px solid var(--border-strong); }
   .date-header .d-title { font-size: 22px; font-weight: 800; color: var(--text); }
   
   .date-summary-box { background: var(--card); border: 2px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; display: flex; flex-direction: column; font-weight: 700; }
@@ -278,58 +249,76 @@
 
   <h1>外送計時器 / 最低保障收入計算器</h1>
   <p class="sub">計算方式：各單獨立計算，服務分鐘 × 時薪 × 1.25 / 60，最低 45 元</p>
-  
-  <button class="btn-add-timer" id="create-timer-btn">＋ 新接單</button>
 
-  <div class="notice-banner">
-    <div class="notice-title">⚠️ 使用與時間計算提醒</div>
-    <ul>
-      <li><b>工具定位：</b>本計時器僅作個人時間紀錄用。由於手動操作不可能與系統完全同步，實際總金額必定有些微差別。<b>建議當金額落差過大時，再來檢查是否需要跟平台反映。</b></li>
-      <li><b>資料儲存：</b>本工具資料僅存於你的手機瀏覽器，不保證紀錄能永久儲存。建議每日匯出 CSV 備份後刪除當日紀錄。</li>
-      <li><b>伺服器時差：</b>本工具以「你的裝置時間」為準，平台紀錄則以「平台伺服器時間」為準，兩者可能有些許時間差。</li>
-      <li><b>計算單位：</b>為保證數據穩定，本工具之服務時間<b>僅以「整數分鐘」為單位</b>進行估算（未滿 30 秒捨去，滿 30 秒進位）；而平台系統則是以「精確秒數」等比例計算。</li>
-      <li><b>免責聲明：</b>本工具僅供個人紀錄與試算參考，<b>不具備法律效力或官方約束力</b>。實際結算金額與外送服務時間仍以各外送平台官方系統最終發布之數據為準。</li>
-    </ul>
-    <div class="notice-footer">
-      ※ 綜合上述因素與手動點擊時間差，<b>單筆訂單</b>之計時結果與平台實際紀錄若有前後 1～2 分鐘落差，以及多單累積後的些許總額差異，皆屬正常現象。
+  <!-- 分頁 1：跑單計時 -->
+  <div id="tab-timer" class="tab-content active">
+    <button class="btn-add-timer" id="create-timer-btn">＋ 新接單</button>
+
+    <div id="timers-container"></div>
+
+    <div class="notice-banner">
+      <div class="notice-title">⚠️ 使用與時間計算提醒</div>
+      <ul>
+        <li><b>工具定位：</b>本計時器僅作個人時間紀錄用。由於手動操作不可能與系統完全同步，實際總金額必定有些微差別。<b>建議當金額落差過大時，再來檢查是否需要跟平台反映。</b></li>
+        <li><b>資料儲存：</b>本工具資料僅存於你的手機瀏覽器，不保證紀錄能永久儲存。建議每日匯出 CSV 備份後刪除當日紀錄。</li>
+        <li><b>伺服器時差：</b>本工具以「你的裝置時間」為準，平台紀錄則以「平台伺服器時間」為準，兩者可能有些許時間差。</li>
+        <li><b>計算單位：</b>為保證數據穩定，本工具之服務時間<b>僅以「整數分鐘」為單位</b>進行估算（未滿 30 秒捨去，滿 30 秒進位）；而平台系統則是以「精確秒數」等比例計算。</li>
+        <li><b>免責聲明：</b>本工具僅供個人紀錄與試算參考，<b>不具備法律效力或官方約束力</b>。實際結算金額與外送服務時間仍以各外送平台官方系統最終發布之數據為準。</li>
+      </ul>
+      <div class="notice-footer">
+        ※ 綜合上述因素與手動點擊時間差，<b>單筆訂單</b>之計時結果與平台實際紀錄若有前後 1～2 分鐘落差，以及多單累積後的些許總額差異，皆屬正常現象。
+      </div>
     </div>
+
+    <details class="guide-dropdown">
+      <summary>💡 使用須知與夾單說明 <span>▾</span></summary>
+      <div class="guide-content">
+        若為同時接獲的多筆訂單，請使用「完送此單並夾單」來分開計算各單送達時間；若為行程中額外新派發的獨立夾單，則建議透過 "＋ 新接單" 另外建立獨立計時器。
+      </div>
+    </details>
   </div>
 
-  <details class="guide-dropdown">
-    <summary>💡 使用須知與夾單說明 <span>▾</span></summary>
-    <div class="guide-content">
-      若為同時接獲的多筆訂單，請使用「完送此單並夾單」來分開計算各單送達時間；若為行程中額外新派發的獨立夾單，則建議透過 "＋ 新接單" 另外建立獨立計時器。
+  <!-- 分頁 2：接單紀錄 -->
+  <div id="tab-history" class="tab-content">
+    <div class="section-title">
+      <h2>接單紀錄</h2>
+      <div class="header-actions">
+        <button class="link-btn" id="sort-toggle-btn" title="切換排序方式">排序：新到舊 ▾</button>
+        <button class="link-btn" id="settings-btn">設定時薪 ▾</button>
+      </div>
     </div>
-  </details>
 
-  <div id="timers-container"></div>
-
-  <div class="section-title">
-    <h2>接單紀錄</h2>
-    <div class="header-actions">
-      <button class="link-btn" id="sort-toggle-btn" title="切換排序方式">排序：新到舊 ▾</button>
-      <button class="link-btn" id="settings-btn">設定時薪 ▾</button>
+    <div class="settings-panel" id="settings-panel">
+      <div class="settings-row">
+        <span>目前法定最低時薪</span>
+        <input type="number" id="wage-input" value="196">
+      </div>
     </div>
-  </div>
 
-  <div class="settings-panel" id="settings-panel">
-    <div class="settings-row">
-      <span>目前法定最低時薪</span>
-      <input type="number" id="wage-input" value="196">
+    <div class="summary" id="summary" style="display:none;"></div>
+    <div id="history-list"></div>
+    
+    <div id="clear-all-wrap" style="display:none;">
+      <button class="btn-danger-outline" id="clear-all-btn">清空所有紀錄</button>
     </div>
-  </div>
-
-  <div class="summary" id="summary" style="display:none;"></div>
-  <div id="history-list"></div>
-  
-  <div id="clear-all-wrap" style="display:none;">
-    <button class="btn-danger-outline" id="clear-all-btn">清空所有紀錄</button>
   </div>
 
   <div class="footer-section">
     若 app 有任何問題，請傳email到：<a href="mailto:sigismundbt.dev@gmail.com">sigismundbt.dev@gmail.com</a> 進行回報
     <div class="copyright">© 2026 Peyton Lu. All rights reserved.</div>
   </div>
+</div>
+
+<!-- 固定底部導覽列 -->
+<div class="bottom-nav">
+  <button class="bottom-nav-item active" data-target="tab-timer">
+    <span class="icon">⏱️</span>
+    <span>跑單計時</span>
+  </button>
+  <button class="bottom-nav-item" data-target="tab-history">
+    <span class="icon">📜</span>
+    <span>接單紀錄</span>
+  </button>
 </div>
 
 <script>
@@ -339,6 +328,7 @@
   const STORE_ACTIVE = 'delivery-tracker:activeTimers'; 
   const STORE_LAST_DATE = 'delivery-tracker:lastActiveDate';
   const STORE_THEME = 'delivery-tracker:theme';
+  const STORE_TAB = 'delivery-tracker:currentTab';
   
   let wage = 196;
   const MAX_TIMERS = 4; 
@@ -358,6 +348,46 @@
   const createTimerBtn = document.getElementById('create-timer-btn');
   const themeBtn = document.getElementById('theme-toggle-btn');
   const sortToggleBtn = document.getElementById('sort-toggle-btn');
+
+  // 切換底部選單 Tab 邏輯
+  const navItems = document.querySelectorAll('.bottom-nav-item');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  const switchTab = (targetId) => {
+    navItems.forEach(item => {
+      if (item.getAttribute('data-target') === targetId) {
+        item.classList.add('active');
+      } else {
+        item.classList.remove('active');
+      }
+    });
+
+    tabContents.forEach(content => {
+      if (content.id === targetId) {
+        content.classList.add('active');
+      } else {
+        content.classList.remove('active');
+      }
+    });
+
+    localStorage.setItem(STORE_TAB, targetId);
+  };
+
+  navItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const target = item.getAttribute('data-target');
+      switchTab(target);
+    });
+  });
+
+  const initTab = () => {
+    const savedTab = localStorage.getItem(STORE_TAB);
+    if (savedTab && document.getElementById(savedTab)) {
+      switchTab(savedTab);
+    } else {
+      switchTab('tab-timer');
+    }
+  };
 
   const updateSortBtnText = () => {
     sortToggleBtn.textContent = sortOrder === 'desc' ? '排序：新到舊 ▾' : '排序：舊到新 ▴';
@@ -523,6 +553,7 @@
       }
     }
     
+    initTab();
     renderTimers();
     renderHistory();
     manageTick();
@@ -861,7 +892,7 @@
     if (history.length === 0) {
       summaryEl.style.display = 'none';
       clearAllWrap.style.display = 'none';
-      historyListEl.innerHTML = '<div class="empty">還沒有紀錄，點擊上方按鈕新接單</div>';
+      historyListEl.innerHTML = '<div class="empty">還沒有紀錄，切換至「跑單計時」開啟新接單</div>';
       return;
     }
     
