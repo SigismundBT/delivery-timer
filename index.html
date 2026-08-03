@@ -1,807 +1,1489 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>外送計時器 / 最低保障收入計算器</title>
-<link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
-<link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" />
-<link rel="shortcut icon" href="favicon/favicon.ico" />
-<link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png" />
-<link rel="manifest" href="favicon/site.webmanifest" />
-<script>
-  // 優先在畫面渲染前讀取主題，避免閃爍
-  const savedTheme = localStorage.getItem('delivery-tracker:theme');
-  if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
-</script>
-<style>
-  /* 預設 Light Mode 變數 */
-  :root {
-    --bg: #F5F4F0; --card: #FFFFFF; --border: #E2E0D8; --border-strong: #C9C6BA;
-    --text: #1F1E1B; --text-2: #55534B; --text-3: #8C897E;
-    --accent: #1D6F5C; --accent-bg: #E1F0EB; --accent-text: #0F4A3C;
-    --amber: #8A5A12; --amber-bg: #FBF0DE;
-    --danger: #B3392B; --danger-bg: #FBEAE7;
-    --success: #206A42; --success-bg: #E6F4EA;
-    --radius: 16px;
-  }
-  
-  /* 系統預設 Dark Mode */
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]):not([data-theme="dark"]) {
-      --bg: #171613; --card: #211F1C; --border: #332F29; --border-strong: #48423A;
-      --text: #EFEDE7; --text-2: #C2BFB5; --text-3: #8C8A82;
-      --accent: #4FBE9E; --accent-bg: #173832; --accent-text: #8FE2C8;
-      --amber: #F0C878; --amber-bg: #3A2E14;
-      --danger: #E28579; --danger-bg: #3A2320;
-      --success: #66BB6A; --success-bg: #1B3620;
-    }
-  }
-
-  /* 強制指定 Dark Mode */
-  :root[data-theme="dark"] {
-    --bg: #171613; --card: #211F1C; --border: #332F29; --border-strong: #48423A;
-    --text: #EFEDE7; --text-2: #C2BFB5; --text-3: #8C8A82;
-    --accent: #4FBE9E; --accent-bg: #173832; --accent-text: #8FE2C8;
-    --amber: #F0C878; --amber-bg: #3A2E14;
-    --danger: #E28579; --danger-bg: #3A2320;
-    --success: #66BB6A; --success-bg: #1B3620;
-  }
-
-  /* 強制指定 Light Mode */
-  :root[data-theme="light"] {
-    --bg: #F5F4F0; --card: #FFFFFF; --border: #E2E0D8; --border-strong: #C9C6BA;
-    --text: #1F1E1B; --text-2: #55534B; --text-3: #8C897E;
-    --accent: #1D6F5C; --accent-bg: #E1F0EB; --accent-text: #0F4A3C;
-    --amber: #8A5A12; --amber-bg: #FBF0DE;
-    --danger: #B3392B; --danger-bg: #FBEAE7;
-    --success: #206A42; --success-bg: #E6F4EA;
-  }
-
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; transition: background 0.2s, color 0.2s; }
-  
-  /* 預留底部 Nav 欄位的空間 (120px) */
-  .wrap { position: relative; max-width: 500px; margin: 0 auto; padding: 20px 16px 120px; }
-  @media (min-width: 768px) {
-    .wrap { max-width: 720px; padding: 32px 24px 140px; }
-  }
-
-  /* 主題切換按鈕 */
-  .theme-toggle-btn {
-    position: absolute; top: 16px; right: 16px;
-    background: var(--card); border: 2px solid var(--border-strong);
-    border-radius: 50%; width: 44px; height: 44px;
-    font-size: 22px; cursor: pointer; display: flex;
-    align-items: center; justify-content: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    color: var(--text); z-index: 99; transition: 0.2s;
-  }
-  .theme-toggle-btn:active { transform: scale(0.92); }
-
-  h1 { font-size: 26px; font-weight: 800; margin: 0 0 8px; }
-  .sub { font-size: 17px; color: var(--text-2); margin: 0 0 16px; font-weight: 600; line-height: 1.4; }
-  
-  /* 分頁切換區塊控制 */
-  .tab-content { display: none; }
-  .tab-content.active { display: block; }
-
-  /* 底部導覽列 (Bottom Navigation Bar) */
-  .bottom-nav {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    background: var(--card); border-top: 2px solid var(--border);
-    display: flex; justify-content: space-around; align-items: center;
-    height: 70px; z-index: 1000; box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
-  }
-  .bottom-nav-item {
-    flex: 1; height: 100%; background: none; border: none;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 4px; color: var(--text-3); font-size: 14px; font-weight: 800;
-    transition: color 0.2s;
-  }
-  .bottom-nav-item .icon { font-size: 22px; }
-  .bottom-nav-item.active { color: var(--accent); }
-
-  .guide-dropdown { background: var(--card); border: 2px solid var(--border-strong); border-radius: 12px; margin-bottom: 20px; font-weight: 700; overflow: hidden; }
-  .guide-dropdown summary { padding: 14px 16px; font-size: 17px; color: var(--accent-text); cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; }
-  .guide-dropdown summary::-webkit-details-marker { display: none; }
-  .guide-content { padding: 0 16px 16px; font-size: 16px; color: var(--text-2); line-height: 1.6; border-top: 1px solid var(--border); padding-top: 12px; font-weight: 600; }
-
-  /* Notice Banner */
-  .notice-banner {
-    background-color: #fff9e6; border-left: 4px solid #ffc107; color: #856404;
-    padding: 18px; border-radius: 12px; margin-bottom: 24px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); text-align: left;
-  }
-  .notice-banner .notice-title { font-size: 19px; font-weight: 800; margin-bottom: 10px; color: #856404; }
-  .notice-banner ul { margin: 0; padding-left: 22px; line-height: 1.7; font-size: 17px; color: #856404; }
-  .notice-banner b { color: #533f03; }
-  .notice-banner .notice-footer { font-size: 16px; margin-top: 12px; opacity: 0.95; font-weight: 600; line-height: 1.6; color: #856404; }
-
-  /* Notice Banner Dark Mode */
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) .notice-banner { background-color: #2a2415; border-left: 4px solid #f39c12; color: #e6c875; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); }
-    :root:not([data-theme="light"]) .notice-banner .notice-title,
-    :root:not([data-theme="light"]) .notice-banner b { color: #fff0be; }
-    :root:not([data-theme="light"]) .notice-banner ul,
-    :root:not([data-theme="light"]) .notice-banner .notice-footer { color: #e6c875; }
-  }
-  :root[data-theme="dark"] .notice-banner { background-color: #2a2415; border-left: 4px solid #f39c12; color: #e6c875; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); }
-  :root[data-theme="dark"] .notice-banner .notice-title,
-  :root[data-theme="dark"] .notice-banner b { color: #fff0be; }
-  :root[data-theme="dark"] .notice-banner ul,
-  :root[data-theme="dark"] .notice-banner .notice-footer { color: #e6c875; }
-
-  button { font-family: inherit; -webkit-appearance: none; appearance: none; cursor: pointer; }
-  
-  .btn-add-timer { width: 100%; height: 72px; border-radius: var(--radius); border: none; background: var(--accent); color: #fff; font-size: 22px; font-weight: 800; margin-bottom: 20px; box-shadow: 0 4px 14px rgba(0,0,0,0.15); }
-  .btn-add-timer:active { opacity: 0.85; }
-
-  .timer-card { background: var(--card); border: 3px solid var(--accent); border-radius: var(--radius); padding: 22px; margin-bottom: 20px; position: relative; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
-  .timer-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-  .timer-title-wrap { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .timer-title { font-size: 20px; font-weight: 800; color: var(--accent-text); background: var(--accent-bg); padding: 8px 14px; border-radius: 10px; }
-  .badge-stacked { font-size: 16px; font-weight: 800; color: var(--amber); background: var(--amber-bg); padding: 8px 14px; border-radius: 12px; }
-  
-  .btn-cancel-timer { background: transparent; border: none; color: var(--text-3); font-size: 28px; line-height: 1; padding: 10px; margin: -10px -10px 0 0; border-radius: 10px; }
-  .btn-cancel-timer:active { background: var(--danger-bg); color: var(--danger); }
-
-  .timer-clock { text-align: center; margin: 16px 0 24px; }
-  .timer-clock .t { font-size: 64px; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1.1; letter-spacing: -2px; }
-  .timer-clock .meta { font-size: 18px; color: var(--text-2); margin-top: 10px; font-weight: 700; }
-  .timer-clock .g-amt { font-size: 22px; font-weight: 900; color: var(--accent); }
-
-  .order-timeline { background: var(--bg); border-radius: 14px; padding: 14px; margin-bottom: 18px; display: flex; flex-direction: column; gap: 12px; }
-  .timeline-item { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: var(--card); border: 2px solid var(--border); border-radius: 12px; font-size: 17px; }
-  
-  .btn-undo { background: var(--card); border: 2px solid var(--border-strong); border-radius: 10px; padding: 10px 16px; font-size: 16px; color: var(--text); font-weight: 700; }
-  .btn-undo:active { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
-
-  .btn-row { display: flex; gap: 12px; margin-top: 18px; }
-  .btn-half { flex: 1; height: 72px; border-radius: var(--radius); border: 2px solid var(--border-strong); background: var(--bg); color: var(--text); font-size: 17px; font-weight: 800; line-height: 1.4; padding: 0 6px; }
-  .btn-half.finish { background: var(--danger-bg); border-color: var(--danger); color: var(--danger); }
-  .btn-half:active { opacity: 0.8; }
-
-  .section-title { display: flex; align-items: center; justify-content: space-between; margin: 10px 0 14px; }
-  .section-title h2 { font-size: 22px; font-weight: 800; margin: 0; }
-  .header-actions { display: flex; gap: 10px; align-items: center; }
-  .link-btn { font-size: 17px; color: var(--text-2); background: none; border: none; padding: 8px; font-weight: 700; }
-  
-  .settings-panel { display: none; background: var(--card); border: 2px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
-  .settings-panel.open { display: block; }
-  .settings-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 18px; font-weight: 700; }
-  input[type=number] { width: 120px; height: 50px; border-radius: 10px; border: 2px solid var(--border-strong); background: var(--bg); color: var(--text); font-size: 20px; font-weight: 800; padding: 0 10px; text-align: center; }
-  
-  .card { background: var(--card); border: 2px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 14px; }
-  
-  .date-section { margin-bottom: 32px; }
-  .date-header { display: flex; justify-content: space-between; align-items: flex-end; margin: 20px 0 12px 4px; padding-bottom: 10px; border-bottom: 3px solid var(--border-strong); }
-  .date-header .d-title { font-size: 22px; font-weight: 800; color: var(--text); }
-  
-  .date-summary-box { background: var(--card); border: 2px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; display: flex; flex-direction: column; font-weight: 700; }
-
-  .hist-item { background: var(--card); border: 2px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; position: relative; }
-  .hist-head-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
-  .hist-title { font-size: 20px; font-weight: 800; color: var(--text); }
-  
-  .btn-hist-x { background: none; border: none; color: var(--text-3); font-size: 26px; font-weight: 800; line-height: 1; padding: 8px 12px; margin: -10px -10px 0 0; border-radius: 8px; cursor: pointer; }
-  .btn-hist-x:active { background: var(--danger-bg); color: var(--danger); }
-
-  .hist-summary-bar { font-size: 17px; color: var(--text-2); margin-bottom: 16px; display: flex; gap: 14px; font-weight: 700; }
-  
-  .hist-sublist-container { background: var(--bg); border-radius: 14px; padding: 14px; margin-bottom: 18px; display: flex; flex-direction: column; gap: 12px; }
-  .hist-sub-card { background: var(--card); border: 2px solid var(--border); border-radius: 12px; padding: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-  
-  .hist-sub-left { display: flex; flex-direction: column; gap: 6px; }
-  .hist-sub-tag { font-size: 17px; font-weight: 800; color: var(--text); }
-  .hist-sub-time { font-size: 16px; color: var(--text-2); font-variant-numeric: tabular-nums; font-weight: 700; }
-  
-  .hist-sub-right { display: flex; align-items: center; gap: 14px; }
-  .hist-sub-metric { text-align: right; display: flex; flex-direction: column; gap: 4px; }
-  .sub-metric-mins { font-size: 15px; color: var(--text-2); font-weight: 700; }
-  .sub-metric-amt { font-size: 20px; font-weight: 900; color: var(--accent); }
-  
-  .btn-action-sub { background: var(--card); border: 2px solid var(--border-strong); border-radius: 10px; padding: 8px 12px; font-size: 14px; font-weight: 800; color: var(--text); }
-  .btn-action-sub:active { background: var(--accent-bg); color: var(--accent-text); }
-
-  .btn-del-suborder { background: var(--danger-bg); color: var(--danger); border: none; border-radius: 10px; padding: 8px 12px; font-size: 14px; font-weight: 800; }
-  .btn-del-suborder:active { opacity: 0.8; }
-
-  .btn-add-suborder { width: 100%; padding: 12px; background: var(--card); border: 2px dashed var(--border-strong); border-radius: 12px; font-size: 16px; font-weight: 800; color: var(--accent); margin-top: 4px; transition: 0.2s; }
-  .btn-add-suborder:active { background: var(--accent-bg); border-color: var(--accent); }
-
-  /* 數字微調編輯區塊 */
-  .sub-edit-box { width: 100%; background: var(--card); border: 2px dashed var(--accent); border-radius: 10px; padding: 14px; margin-top: 8px; display: flex; flex-direction: column; gap: 12px; font-size: 16px; font-weight: 700; }
-  .sub-edit-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .time-inputs-group { display: flex; align-items: center; gap: 6px; }
-  .time-num-input { width: 68px; height: 44px; text-align: center; font-size: 20px; font-weight: 900; border-radius: 8px; border: 2px solid var(--border-strong); background: var(--bg); color: var(--text); }
-  .sub-edit-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
-  .btn-save-sub { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 15px; font-weight: 800; }
-  .btn-cancel-sub { background: var(--bg); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 16px; font-size: 15px; font-weight: 800; }
-
-  .hist-mid { display: flex; justify-content: space-between; align-items: center; border-top: 2px solid var(--border); padding-top: 16px; }
-  .guarantee { font-size: 17px; color: var(--text-2); display: flex; flex-direction: column; gap: 6px; font-weight: 700; }
-  .guarantee b { color: var(--text); font-weight: 900; font-size: 24px; }
-  .actual-wrap { display: flex; align-items: center; gap: 10px; font-size: 17px; color: var(--text-2); font-weight: 800; }
-  .actual-input { width: 120px; height: 54px; font-size: 24px; font-weight: 900; text-align: center; }
-  
-  .status-box { margin-top: 16px; font-size: 17px; border-radius: 10px; padding: 12px 14px; font-weight: 800; text-align: center; }
-  .status-box.warn { color: var(--danger); background: var(--danger-bg); }
-  .status-box.success { color: var(--success); background: var(--success-bg); }
-
-  .empty { font-size: 18px; color: var(--text-3); text-align: center; padding: 50px 0; font-weight: 700; }
-  
-  .summary { display: flex; gap: 12px; margin-bottom: 16px; }
-  .summary .card { flex: 1; margin-bottom: 0; padding: 18px 12px; text-align: center; }
-  .summary .num { font-size: 28px; font-weight: 900; }
-  .summary .lbl { font-size: 15px; color: var(--text-2); margin-top: 6px; font-weight: 700; }
-  
-  .btn-danger-outline { width: 100%; height: 60px; border-radius: var(--radius); border: 3px solid var(--danger); background: transparent; color: var(--danger); font-size: 18px; font-weight: 800; margin-top: 36px; }
-
-  .footer-section { margin-top: 40px; text-align: center; font-size: 16px; color: var(--text-2); font-weight: 700; line-height: 1.6; }
-  .footer-section a { color: var(--accent); text-decoration: underline; }
-  .footer-section .copyright { margin-top: 8px; font-size: 15px; color: var(--text-3); font-weight: 600; }
-</style>
-</head>
-<body>
-<div class="wrap">
-  <button id="theme-toggle-btn" class="theme-toggle-btn" title="切換深淺色模式">🌓</button>
-
-  <h1>外送計時器 / 最低保障收入計算器</h1>
-  <p class="sub">計算方式：各單獨立計算，服務分鐘 × 時薪 × 1.25 / 60，最低 45 元</p>
-
-  <!-- 分頁 1：跑單計時 -->
-  <div id="tab-timer" class="tab-content active">
-    <button class="btn-add-timer" id="create-timer-btn">＋ 新接單</button>
-
-    <div id="timers-container"></div>
-
-    <div class="notice-banner">
-      <div class="notice-title">⚠️ 使用與時間計算提醒</div>
-      <ul>
-        <li><b>工具定位：</b>本計時器僅作個人時間紀錄用。由於手動操作不可能與系統完全同步，實際總金額必定有些微差別。<b>建議當金額落差過大時，再來檢查是否需要跟平台反映。</b></li>
-        <li><b>資料儲存：</b>本工具資料僅存於你的手機瀏覽器，不保證紀錄能永久儲存。建議每日匯出 CSV 備份後刪除當日紀錄。</li>
-        <li><b>伺服器時差：</b>本工具以「你的裝置時間」為準，平台紀錄則以「平台伺服器時間」為準，兩者可能有些許時間差。</li>
-        <li><b>計算單位：</b>為保證數據穩定，本工具之服務時間<b>僅以「整數分鐘」為單位</b>進行估算（未滿 30 秒捨去，滿 30 秒進位）；而平台系統則是以「精確秒數」等比例計算。</li>
-        <li><b>免責聲明：</b>本工具僅供個人紀錄與試算參考，<b>不具備法律效力或官方約束力</b>。實際結算金額與外送服務時間仍以各外送平台官方系統最終發布之數據為準。</li>
-      </ul>
-      <div class="notice-footer">
-        ※ 綜合上述因素與手動點擊時間差，<b>單筆訂單</b>之計時結果與平台實際紀錄若有前後 1～2 分鐘落差，以及多單累積後的些許總額差異，皆屬正常現象。
-      </div>
-    </div>
-
-    <details class="guide-dropdown">
-      <summary>💡 使用須知與夾單說明 <span>▾</span></summary>
-      <div class="guide-content">
-        若為同時接獲的多筆訂單，請使用「完送此單並夾單」來分開計算各單送達時間；若為行程中額外新派發的獨立夾單，則建議透過 "＋ 新接單" 另外建立獨立計時器。
-      </div>
-    </details>
-  </div>
-
-  <!-- 分頁 2：接單紀錄 -->
-  <div id="tab-history" class="tab-content">
-    <div class="section-title">
-      <h2>接單紀錄</h2>
-      <div class="header-actions">
-        <button class="link-btn" id="sort-toggle-btn" title="切換排序方式">排序：新到舊 ▾</button>
-        <button class="link-btn" id="settings-btn">設定時薪 ▾</button>
-      </div>
-    </div>
-
-    <div class="settings-panel" id="settings-panel">
-      <div class="settings-row">
-        <span>目前法定最低時薪</span>
-        <input type="number" id="wage-input" value="196">
-      </div>
-    </div>
-
-    <div class="summary" id="summary" style="display:none;"></div>
-    <div id="history-list"></div>
-    
-    <div id="clear-all-wrap" style="display:none;">
-      <button class="btn-danger-outline" id="clear-all-btn">清空所有紀錄</button>
-    </div>
-  </div>
-
-  <div class="footer-section">
-    若 app 有任何問題，請傳email到：<a href="mailto:sigismundbt.dev@gmail.com">sigismundbt.dev@gmail.com</a> 進行回報
-    <div class="copyright">© 2026 Peyton Lu. All rights reserved.</div>
-  </div>
-</div>
-
-<!-- 固定底部導覽列 -->
-<div class="bottom-nav">
-  <button class="bottom-nav-item active" data-target="tab-timer">
-    <span class="icon">⏱️</span>
-    <span>跑單計時</span>
-  </button>
-  <button class="bottom-nav-item" data-target="tab-history">
-    <span class="icon">📜</span>
-    <span>接單紀錄</span>
-  </button>
-</div>
-
-<script>
-(() => {
-  const STORE_HIST = 'delivery-tracker:history';
-  const STORE_SET = 'delivery-tracker:settings';
-  const STORE_ACTIVE = 'delivery-tracker:activeTimers'; 
-  const STORE_LAST_DATE = 'delivery-tracker:lastActiveDate';
-  const STORE_THEME = 'delivery-tracker:theme';
-  const STORE_TAB = 'delivery-tracker:currentTab';
-  
-  let wage = 196;
-  const MAX_TIMERS = 4; 
-  
-  let activeTimers = [];
-  let timerCounter = 0;
-  let history = [];
-  let sortOrder = 'desc'; 
-  let tickHandle = null;
-
-  const timersContainer = document.getElementById('timers-container');
-  const historyListEl = document.getElementById('history-list');
-  const summaryEl = document.getElementById('summary');
-  const settingsPanel = document.getElementById('settings-panel');
-  const wageInput = document.getElementById('wage-input');
-  const clearAllWrap = document.getElementById('clear-all-wrap');
-  const createTimerBtn = document.getElementById('create-timer-btn');
-  const themeBtn = document.getElementById('theme-toggle-btn');
-  const sortToggleBtn = document.getElementById('sort-toggle-btn');
-
-  // 切換底部選單 Tab 邏輯
-  const navItems = document.querySelectorAll('.bottom-nav-item');
-  const tabContents = document.querySelectorAll('.tab-content');
-
-  const switchTab = (targetId) => {
-    navItems.forEach(item => {
-      if (item.getAttribute('data-target') === targetId) {
-        item.classList.add('active');
-      } else {
-        item.classList.remove('active');
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>外送計時器 / 最低保障收入計算器</title>
+    <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" />
+    <link rel="shortcut icon" href="favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="favicon/site.webmanifest" />
+    <script>
+      // 優先在畫面渲染前讀取主題，避免閃爍
+      const savedTheme = localStorage.getItem('delivery-tracker:theme');
+      if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+    <style>
+      /* 預設 Light Mode 變數 */
+      :root {
+        --bg: #f5f4f0;
+        --card: #ffffff;
+        --border: #e2e0d8;
+        --border-strong: #c9c6ba;
+        --text: #1f1e1b;
+        --text-2: #55534b;
+        --text-3: #8c897e;
+        --accent: #1d6f5c;
+        --accent-bg: #e1f0eb;
+        --accent-text: #0f4a3c;
+        --amber: #8a5a12;
+        --amber-bg: #fbf0de;
+        --danger: #b3392b;
+        --danger-bg: #fbeae7;
+        --success: #206a42;
+        --success-bg: #e6f4ea;
+        --radius: 16px;
       }
-    });
 
-    tabContents.forEach(content => {
-      if (content.id === targetId) {
-        content.classList.add('active');
-      } else {
-        content.classList.remove('active');
-      }
-    });
-
-    localStorage.setItem(STORE_TAB, targetId);
-  };
-
-  navItems.forEach(item => {
-    item.addEventListener('click', () => {
-      const target = item.getAttribute('data-target');
-      switchTab(target);
-    });
-  });
-
-  const initTab = () => {
-    const savedTab = localStorage.getItem(STORE_TAB);
-    if (savedTab && document.getElementById(savedTab)) {
-      switchTab(savedTab);
-    } else {
-      switchTab('tab-timer');
-    }
-  };
-
-  const updateSortBtnText = () => {
-    sortToggleBtn.textContent = sortOrder === 'desc' ? '排序：新到舊 ▾' : '排序：舊到新 ▴';
-  };
-  updateSortBtnText();
-
-  sortToggleBtn.addEventListener('click', () => {
-    sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
-    updateSortBtnText();
-    updateHistoryLabels();
-    renderHistory();
-  });
-
-  themeBtn.addEventListener('click', () => {
-    const currentTheme = localStorage.getItem(STORE_THEME);
-    let nextTheme;
-    if (currentTheme === null) {
-      nextTheme = 'light';
-      themeBtn.textContent = '☀️';
-      themeBtn.title = '目前：強制淺色（點擊切換為強制深色）';
-    } else if (currentTheme === 'light') {
-      nextTheme = 'dark';
-      themeBtn.textContent = '🌙';
-      themeBtn.title = '目前：強制深色（點擊切換為跟隨系統）';
-    } else {
-      nextTheme = null;
-      themeBtn.textContent = '🌓';
-      themeBtn.title = '目前：跟隨系統預設（點擊切換為強制淺色）';
-    }
-
-    if (nextTheme === null) {
-      document.documentElement.removeAttribute('data-theme');
-      localStorage.removeItem(STORE_THEME);
-    } else {
-      document.documentElement.setAttribute('data-theme', nextTheme);
-      localStorage.setItem(STORE_THEME, nextTheme);
-    }
-  });
-
-  const initThemeButton = () => {
-    const currentTheme = localStorage.getItem(STORE_THEME);
-    if (currentTheme === 'light') {
-      themeBtn.textContent = '☀️';
-      themeBtn.title = '目前：強制淺色（點擊切換為強制深色）';
-    } else if (currentTheme === 'dark') {
-      themeBtn.textContent = '🌙';
-      themeBtn.title = '目前：強制深色（點擊切換為跟隨系統）';
-    } else {
-      themeBtn.textContent = '🌓';
-      themeBtn.title = '目前：跟隨系統預設（點擊切換為強制淺色）';
-    }
-  };
-  initThemeButton();
-
-  const pad = n => n < 10 ? `0${n}` : `${n}`;
-  const fmtClock = sec => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${pad(m)}:${pad(s)}`;
-  };
-  
-  const fmtDate = ts => {
-    const d = new Date(ts);
-    return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
-  };
-  
-  const fmtTime = ts => {
-    const d = new Date(ts);
-    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  };
-  
-  const computeGuarantee = diffSec => {
-    let mins = Math.floor(diffSec / 60);
-    const rem = diffSec % 60;
-    if (rem >= 30) mins += 1;
-    if (mins < 1) mins = 1;
-    let amt = (mins / 60) * wage * 1.25;
-    if (amt < 45) amt = 45;
-    return { mins, amt: Math.round(amt) };
-  };
-
-  const checkDailyReset = () => {
-    const todayStr = fmtDate(Date.now());
-    const lastActiveDate = localStorage.getItem(STORE_LAST_DATE);
-
-    if (lastActiveDate !== todayStr) {
-      activeTimers = [];
-      timerCounter = 0;
-      localStorage.removeItem(STORE_ACTIVE);
-      localStorage.setItem(STORE_LAST_DATE, todayStr);
-      return true;
-    }
-    return false;
-  };
-
-  const recalculateTrip = item => {
-    if (!item.orders || item.orders.length === 0) return;
-
-    const tripStartTs = Math.min(...item.orders.map(o => o.startTs));
-    item.startTs = tripStartTs;
-
-    item.orders.forEach((ord) => {
-      ord.startTs = tripStartTs;
-
-      const diffSec = Math.max(0, Math.floor((ord.endTs - ord.startTs) / 1000));
-      const g = computeGuarantee(diffSec);
-      ord.mins = g.mins;
-      ord.guaranteed = g.amt;
-    });
-
-    item.endTs = Math.max(...item.orders.map(o => o.endTs));
-    item.mins = Math.max(1, Math.round((item.endTs - item.startTs) / 60000));
-    item.guaranteed = item.orders.reduce((sum, ord) => sum + ord.guaranteed, 0);
-  };
-
-  const updateHistoryLabels = () => {
-    const dateKeys = [...new Set(history.map(h => fmtDate(h.startTs)))];
-    
-    dateKeys.forEach(dateStr => {
-      const items = history.filter(h => fmtDate(h.startTs) === dateStr);
-      items.sort((a, b) => a.startTs - b.startTs);
-      
-      items.forEach((item, index) => {
-        const num = index + 1;
-        const orderCount = item.orders ? item.orders.length : 1;
-        item.label = orderCount > 1 
-          ? `趟次 #${num} (夾單共 ${orderCount} 單)` 
-          : `趟次 #${num} (1 單)`;
-      });
-    });
-    
-    history.sort((a, b) => sortOrder === 'desc' ? b.startTs - a.startTs : a.startTs - b.startTs);
-  };
-
-  const loadState = () => {
-    const s = localStorage.getItem(STORE_SET);
-    if (s) { 
-      const p = JSON.parse(s); 
-      if (p.wage) wage = p.wage; 
-    }
-    wageInput.value = wage;
-    
-    const h = localStorage.getItem(STORE_HIST);
-    if (h) {
-      history = JSON.parse(h);
-      history.forEach(item => {
-        recalculateTrip(item);
-      });
-      updateHistoryLabels();
-      saveHistory(); 
-    }
-    
-    const isNewDay = checkDailyReset();
-
-    if (!isNewDay) {
-      const a = localStorage.getItem(STORE_ACTIVE);
-      if (a) { 
-        activeTimers = JSON.parse(a); 
-        if (activeTimers.length > 0) {
-          const maxCounter = Math.max(...activeTimers.map(t => parseInt(t.name.split('#')[1]) || 0));
-          timerCounter = Math.max(timerCounter, maxCounter);
+      /* 系統預設 Dark Mode */
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']):not([data-theme='dark']) {
+          --bg: #171613;
+          --card: #211f1c;
+          --border: #332f29;
+          --border-strong: #48423a;
+          --text: #efede7;
+          --text-2: #c2bfb5;
+          --text-3: #8c8a82;
+          --accent: #4fbe9e;
+          --accent-bg: #173832;
+          --accent-text: #8fe2c8;
+          --amber: #f0c878;
+          --amber-bg: #3a2e14;
+          --danger: #e28579;
+          --danger-bg: #3a2320;
+          --success: #66bb6a;
+          --success-bg: #1b3620;
         }
       }
-    }
-    
-    initTab();
-    renderTimers();
-    renderHistory();
-    manageTick();
-  };
-  
-  const saveSettings = () => localStorage.setItem(STORE_SET, JSON.stringify({ wage }));
-  const saveHistory = () => localStorage.setItem(STORE_HIST, JSON.stringify(history));
-  const saveActiveTimers = () => localStorage.setItem(STORE_ACTIVE, JSON.stringify(activeTimers));
 
-  const checkTimerLimit = () => {
-    createTimerBtn.style.display = activeTimers.length >= MAX_TIMERS ? 'none' : 'block';
-  };
+      /* 強制指定 Dark Mode */
+      :root[data-theme='dark'] {
+        --bg: #171613;
+        --card: #211f1c;
+        --border: #332f29;
+        --border-strong: #48423a;
+        --text: #efede7;
+        --text-2: #c2bfb5;
+        --text-3: #8c8a82;
+        --accent: #4fbe9e;
+        --accent-bg: #173832;
+        --accent-text: #8fe2c8;
+        --amber: #f0c878;
+        --amber-bg: #3a2e14;
+        --danger: #e28579;
+        --danger-bg: #3a2320;
+        --success: #66bb6a;
+        --success-bg: #1b3620;
+      }
 
-  const createTimer = () => {
-    if (activeTimers.length >= MAX_TIMERS) return;
-    checkDailyReset();
+      /* 強制指定 Light Mode */
+      :root[data-theme='light'] {
+        --bg: #f5f4f0;
+        --card: #ffffff;
+        --border: #e2e0d8;
+        --border-strong: #c9c6ba;
+        --text: #1f1e1b;
+        --text-2: #55534b;
+        --text-3: #8c897e;
+        --accent: #1d6f5c;
+        --accent-bg: #e1f0eb;
+        --accent-text: #0f4a3c;
+        --amber: #8a5a12;
+        --amber-bg: #fbf0de;
+        --danger: #b3392b;
+        --danger-bg: #fbeae7;
+        --success: #206a42;
+        --success-bg: #e6f4ea;
+      }
 
-    const activeMax = activeTimers.length > 0 
-      ? Math.max(...activeTimers.map(t => parseInt(t.name.match(/#(\d+)/)?.[1]) || 0)) 
-      : 0;
-    const tempCounter = activeMax + 1;
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+        transition:
+          background 0.2s,
+          color 0.2s;
+      }
 
-    const now = Date.now();
-    const timerObj = {
-      id: `t_${now}_${tempCounter}`,
-      name: `新趟次 #${tempCounter}`, 
-      firstOrderStartTs: now,      
-      orders: []
-    };
-    activeTimers.push(timerObj);
-    saveActiveTimers(); 
-    renderTimers();
-    manageTick();
-  };
+      /* 預留底部 Nav 欄位的空間 (120px) */
+      .wrap {
+        position: relative;
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 20px 16px 120px;
+      }
+      @media (min-width: 768px) {
+        .wrap {
+          max-width: 720px;
+          padding: 32px 24px 140px;
+        }
+      }
 
-  const cancelTimer = id => {
-    if (!window.confirm('確定要取消這個計時器嗎？\n（此操作不會留下紀錄）')) return;
-    activeTimers = activeTimers.filter(t => t.id !== id);
-    saveActiveTimers();
-    renderTimers();
-    manageTick();
-  };
+      /* 主題切換按鈕 */
+      .theme-toggle-btn {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        background: var(--card);
+        border: 2px solid var(--border-strong);
+        border-radius: 50%;
+        width: 44px;
+        height: 44px;
+        font-size: 22px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        color: var(--text);
+        z-index: 99;
+        transition: 0.2s;
+      }
+      .theme-toggle-btn:active {
+        transform: scale(0.92);
+      }
 
-  const addOrderToTimer = id => {
-    const timer = activeTimers.find(t => t.id === id);
-    if (!timer) return;
-    
-    const now = Date.now();
-    const diffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
-    const g = computeGuarantee(diffSec);
-    const orderNum = timer.orders.length + 1;
-    
-    timer.orders.push({
-      orderNum,
-      startTs: timer.firstOrderStartTs, 
-      endTs: now,
-      mins: g.mins,
-      guaranteed: g.amt
-    });
+      h1 {
+        font-size: 26px;
+        font-weight: 800;
+        margin: 0 0 8px;
+      }
+      .sub {
+        font-size: 17px;
+        color: var(--text-2);
+        margin: 0 0 16px;
+        font-weight: 600;
+        line-height: 1.4;
+      }
 
-    saveActiveTimers(); 
-    renderTimers();
-  };
+      /* 分頁切換區塊控制 */
+      .tab-content {
+        display: none;
+      }
+      .tab-content.active {
+        display: block;
+      }
 
-  const undoLastOrder = id => {
-    if (!window.confirm('確定要撤銷剛才的「夾單」操作嗎？')) return;
-    const timer = activeTimers.find(t => t.id === id);
-    if (!timer || timer.orders.length === 0) return;
-    
-    timer.orders.pop();
+      /* 底部導覽列 (Bottom Navigation Bar) */
+      .bottom-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--card);
+        border-top: 2px solid var(--border);
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        height: 70px;
+        z-index: 1000;
+        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+      }
+      .bottom-nav-item {
+        flex: 1;
+        height: 100%;
+        background: none;
+        border: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        color: var(--text-3);
+        font-size: 14px;
+        font-weight: 800;
+        transition: color 0.2s;
+      }
+      .bottom-nav-item .icon {
+        font-size: 22px;
+      }
+      .bottom-nav-item.active {
+        color: var(--accent);
+      }
 
-    saveActiveTimers();
-    renderTimers();
-  };
+      .guide-dropdown {
+        background: var(--card);
+        border: 2px solid var(--border-strong);
+        border-radius: 12px;
+        margin-bottom: 20px;
+        font-weight: 700;
+        overflow: hidden;
+      }
+      .guide-dropdown summary {
+        padding: 14px 16px;
+        font-size: 17px;
+        color: var(--accent-text);
+        cursor: pointer;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .guide-dropdown summary::-webkit-details-marker {
+        display: none;
+      }
+      .guide-content {
+        padding: 0 16px 16px;
+        font-size: 16px;
+        color: var(--text-2);
+        line-height: 1.6;
+        border-top: 1px solid var(--border);
+        padding-top: 12px;
+        font-weight: 600;
+      }
 
-  const finishTimer = id => {
-    const idx = activeTimers.findIndex(t => t.id === id);
-    if (idx === -1) return;
-    const timer = activeTimers[idx];
-    const now = Date.now();
+      /* Notice Banner */
+      .notice-banner {
+        background-color: #fff9e6;
+        border-left: 4px solid #ffc107;
+        color: #856404;
+        padding: 18px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        text-align: left;
+      }
+      .notice-banner .notice-title {
+        font-size: 19px;
+        font-weight: 800;
+        margin-bottom: 10px;
+        color: #856404;
+      }
+      .notice-banner ul {
+        margin: 0;
+        padding-left: 22px;
+        line-height: 1.7;
+        font-size: 17px;
+        color: #856404;
+      }
+      .notice-banner b {
+        color: #533f03;
+      }
+      .notice-banner .notice-footer {
+        font-size: 16px;
+        margin-top: 12px;
+        opacity: 0.95;
+        font-weight: 600;
+        line-height: 1.6;
+        color: #856404;
+      }
 
-    const diffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
-    const g = computeGuarantee(diffSec);
-    const finalOrderNum = timer.orders.length + 1;
-    
-    const allOrders = [...timer.orders, {
-      orderNum: finalOrderNum,
-      startTs: timer.firstOrderStartTs, 
-      endTs: now,
-      mins: g.mins,
-      guaranteed: g.amt
-    }];
+      /* Notice Banner Dark Mode */
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) .notice-banner {
+          background-color: #2a2415;
+          border-left: 4px solid #f39c12;
+          color: #e6c875;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        :root:not([data-theme='light']) .notice-banner .notice-title,
+        :root:not([data-theme='light']) .notice-banner b {
+          color: #fff0be;
+        }
+        :root:not([data-theme='light']) .notice-banner ul,
+        :root:not([data-theme='light']) .notice-banner .notice-footer {
+          color: #e6c875;
+        }
+      }
+      :root[data-theme='dark'] .notice-banner {
+        background-color: #2a2415;
+        border-left: 4px solid #f39c12;
+        color: #e6c875;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+      :root[data-theme='dark'] .notice-banner .notice-title,
+      :root[data-theme='dark'] .notice-banner b {
+        color: #fff0be;
+      }
+      :root[data-theme='dark'] .notice-banner ul,
+      :root[data-theme='dark'] .notice-banner .notice-footer {
+        color: #e6c875;
+      }
 
-    const totalGuaranteed = allOrders.reduce((sum, ord) => sum + ord.guaranteed, 0);
-    const startTs = timer.firstOrderStartTs;
-    const endTs = now;
+      button {
+        font-family: inherit;
+        -webkit-appearance: none;
+        appearance: none;
+        cursor: pointer;
+      }
 
-    history.unshift({ 
-      id: `h${endTs}_${Math.random().toString(36).slice(2,7)}`, 
-      label: '', 
-      startTs, 
-      endTs, 
-      orders: allOrders,
-      mins: Math.max(1, Math.round((endTs - startTs) / 60000)), 
-      guaranteed: totalGuaranteed, 
-      actual: null 
-    });
+      .btn-add-timer {
+        width: 100%;
+        height: 72px;
+        border-radius: var(--radius);
+        border: none;
+        background: var(--accent);
+        color: #fff;
+        font-size: 22px;
+        font-weight: 800;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+      }
+      .btn-add-timer:active {
+        opacity: 0.85;
+      }
 
-    activeTimers.splice(idx, 1);
-    updateHistoryLabels();
-    saveActiveTimers(); 
-    saveHistory();
-    renderTimers();
-    renderHistory();
-    manageTick();
-  };
+      .timer-card {
+        background: var(--card);
+        border: 3px solid var(--accent);
+        border-radius: var(--radius);
+        padding: 22px;
+        margin-bottom: 20px;
+        position: relative;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+      }
+      .timer-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      .timer-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .timer-title {
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--accent-text);
+        background: var(--accent-bg);
+        padding: 8px 14px;
+        border-radius: 10px;
+      }
+      .badge-stacked {
+        font-size: 16px;
+        font-weight: 800;
+        color: var(--amber);
+        background: var(--amber-bg);
+        padding: 8px 14px;
+        border-radius: 12px;
+      }
 
-  const deleteHistory = id => {
-    if (!window.confirm('確定要刪除這筆紀錄嗎？')) return;
-    history = history.filter(h => h.id !== id);
-    updateHistoryLabels();
-    saveHistory();
-    renderHistory();
-  };
-  
-  const addSubOrder = (histId) => {
-    const item = history.find(h => h.id === histId);
-    if (!item) return;
+      .btn-cancel-timer {
+        background: transparent;
+        border: none;
+        color: var(--text-3);
+        font-size: 28px;
+        line-height: 1;
+        padding: 10px;
+        margin: -10px -10px 0 0;
+        border-radius: 10px;
+      }
+      .btn-cancel-timer:active {
+        background: var(--danger-bg);
+        color: var(--danger);
+      }
 
-    const lastOrder = item.orders[item.orders.length - 1];
-    const defaultEndTs = lastOrder ? lastOrder.endTs : Date.now();
-    const newOrderNum = item.orders.length + 1;
+      .timer-clock {
+        text-align: center;
+        margin: 16px 0 24px;
+      }
+      .timer-clock .t {
+        font-size: 64px;
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.1;
+        letter-spacing: -2px;
+      }
+      .timer-clock .meta {
+        font-size: 18px;
+        color: var(--text-2);
+        margin-top: 10px;
+        font-weight: 700;
+      }
+      .timer-clock .g-amt {
+        font-size: 22px;
+        font-weight: 900;
+        color: var(--accent);
+      }
 
-    item.orders.push({
-      orderNum: newOrderNum,
-      startTs: item.startTs,
-      endTs: defaultEndTs,
-      mins: 1,
-      guaranteed: 45
-    });
+      .order-timeline {
+        background: var(--bg);
+        border-radius: 14px;
+        padding: 14px;
+        margin-bottom: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .timeline-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px;
+        background: var(--card);
+        border: 2px solid var(--border);
+        border-radius: 12px;
+        font-size: 17px;
+      }
 
-    recalculateTrip(item);
-    updateHistoryLabels();
-    saveHistory();
-    renderHistory();
-  };
+      .btn-undo {
+        background: var(--card);
+        border: 2px solid var(--border-strong);
+        border-radius: 10px;
+        padding: 10px 16px;
+        font-size: 16px;
+        color: var(--text);
+        font-weight: 700;
+      }
+      .btn-undo:active {
+        background: var(--danger-bg);
+        color: var(--danger);
+        border-color: var(--danger);
+      }
 
-  const deleteSubOrder = (histId, orderIndex) => {
-    if (!window.confirm('確定要移除這筆夾單紀錄嗎？\n移除後將自動重新計算整趟總保障。')) return;
-    const item = history.find(h => h.id === histId);
-    if (!item || item.orders.length <= 1) {
-      alert('每趟至少需要保留一單，若整趟不要請直接刪除整筆紀錄。');
-      return;
-    }
+      .btn-row {
+        display: flex;
+        gap: 12px;
+        margin-top: 18px;
+      }
+      .btn-half {
+        flex: 1;
+        height: 72px;
+        border-radius: var(--radius);
+        border: 2px solid var(--border-strong);
+        background: var(--bg);
+        color: var(--text);
+        font-size: 17px;
+        font-weight: 800;
+        line-height: 1.4;
+        padding: 0 6px;
+      }
+      .btn-half.finish {
+        background: var(--danger-bg);
+        border-color: var(--danger);
+        color: var(--danger);
+      }
+      .btn-half:active {
+        opacity: 0.8;
+      }
 
-    item.orders.splice(orderIndex, 1);
-    item.orders.forEach((ord, idx) => ord.orderNum = idx + 1);
+      .section-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 10px 0 14px;
+      }
+      .section-title h2 {
+        font-size: 22px;
+        font-weight: 800;
+        margin: 0;
+      }
+      .header-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .link-btn {
+        font-size: 17px;
+        color: var(--text-2);
+        background: none;
+        border: none;
+        padding: 8px;
+        font-weight: 700;
+      }
 
-    recalculateTrip(item);
-    updateHistoryLabels(); 
-    saveHistory();
-    renderHistory();
-  };
-  
-  const deleteDateHistory = dateStr => {
-    if (!window.confirm(`確定要清空 ${dateStr} 的所有紀錄嗎？`)) return;
-    history = history.filter(h => fmtDate(h.startTs) !== dateStr);
-    saveHistory();
-    renderHistory();
-  };
+      .settings-panel {
+        display: none;
+        background: var(--card);
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+      .settings-panel.open {
+        display: block;
+      }
+      .settings-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        font-size: 18px;
+        font-weight: 700;
+      }
+      input[type='number'] {
+        width: 120px;
+        height: 50px;
+        border-radius: 10px;
+        border: 2px solid var(--border-strong);
+        background: var(--bg);
+        color: var(--text);
+        font-size: 20px;
+        font-weight: 800;
+        padding: 0 10px;
+        text-align: center;
+      }
 
-  const exportDateCsv = dateStr => {
-    const itemsForDate = history.filter(h => fmtDate(h.startTs) === dateStr);
-    if (itemsForDate.length === 0) {
-      alert('此日無資料可匯出');
-      return;
-    }
-    itemsForDate.sort((a, b) => a.startTs - b.startTs);
+      .card {
+        background: var(--card);
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px;
+        margin-bottom: 14px;
+      }
 
-    let rows = [
-      ["日期", "趟次編號", "總單數", "夾單明細", "總耗時(分)", "整趟總保障(元)", "整趟實拿(元)"]
-    ];
+      .date-section {
+        margin-bottom: 32px;
+      }
+      .date-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin: 20px 0 12px 4px;
+        padding-bottom: 10px;
+        border-bottom: 3px solid var(--border-strong);
+      }
+      .date-header .d-title {
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--text);
+      }
 
-    itemsForDate.forEach((h, index) => {
-      const tripNum = `趟次 #${index + 1}`;
-      const totalOrders = `${h.orders.length}單`;
-      
-      const detailsStr = h.orders.map(o => 
-        `第${o.orderNum}單(${fmtTime(o.startTs)}-${fmtTime(o.endTs)}/${o.mins}分/$${o.guaranteed})`
-      ).join('\n');
+      .date-summary-box {
+        background: var(--card);
+        border: 2px solid var(--border);
+        border-radius: 12px;
+        padding: 16px 18px;
+        margin-bottom: 16px;
+        display: flex;
+        flex-direction: column;
+        font-weight: 700;
+      }
 
-      const actualVal = h.actual !== null ? h.actual : '';
+      .hist-item {
+        background: var(--card);
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px;
+        margin-bottom: 16px;
+        position: relative;
+      }
+      .hist-head-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 10px;
+      }
+      .hist-title {
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--text);
+      }
 
-      rows.push([
-        dateStr,
-        tripNum,
-        totalOrders,
-        detailsStr,
-        h.mins,
-        h.guaranteed,
-        actualVal
-      ]);
-    });
+      .btn-hist-x {
+        background: none;
+        border: none;
+        color: var(--text-3);
+        font-size: 26px;
+        font-weight: 800;
+        line-height: 1;
+        padding: 8px 12px;
+        margin: -10px -10px 0 0;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .btn-hist-x:active {
+        background: var(--danger-bg);
+        color: var(--danger);
+      }
 
-    let csvContent = rows.map(e => 
-      e.map(field => `"${String(field).replace(/"/g, '""')}"`).join(",")
-    ).join("\r\n");
+      .hist-summary-bar {
+        font-size: 17px;
+        color: var(--text-2);
+        margin-bottom: 16px;
+        display: flex;
+        gap: 14px;
+        font-weight: 700;
+      }
 
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `外送保障明細_${dateStr.replace(/\//g, '-')}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
+      .hist-sublist-container {
+        background: var(--bg);
+        border-radius: 14px;
+        padding: 14px;
+        margin-bottom: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .hist-sub-card {
+        background: var(--card);
+        border: 2px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
 
-  const clearAllHistory = () => {
-    if (!window.confirm('確定要清空所有的「歷史紀錄」嗎？\n請確認資料已抄錄完成！')) return;
-    history = [];
-    saveHistory();
-    renderHistory();
-  };
+      .hist-sub-left {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .hist-sub-tag {
+        font-size: 17px;
+        font-weight: 800;
+        color: var(--text);
+      }
+      .hist-sub-time {
+        font-size: 16px;
+        color: var(--text-2);
+        font-variant-numeric: tabular-nums;
+        font-weight: 700;
+      }
 
-  const renderTimers = () => {
-    timersContainer.innerHTML = '';
-    
-    activeTimers.forEach(timer => {
-      const now = Date.now();
-      const totalDiffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
-      const currentDiffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
-      const currentG = computeGuarantee(currentDiffSec);
-      const stackedGuaranteed = timer.orders.reduce((sum, ord) => sum + ord.guaranteed, 0);
-      const totalGuaranteeVisual = stackedGuaranteed + currentG.amt;
+      .hist-sub-right {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .hist-sub-metric {
+        text-align: right;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .sub-metric-mins {
+        font-size: 15px;
+        color: var(--text-2);
+        font-weight: 700;
+      }
+      .sub-metric-amt {
+        font-size: 20px;
+        font-weight: 900;
+        color: var(--accent);
+      }
 
-      const totalOrdersCount = timer.orders.length + 1;
-      const isStacked = timer.orders.length > 0;
+      .btn-action-sub {
+        background: var(--card);
+        border: 2px solid var(--border-strong);
+        border-radius: 10px;
+        padding: 8px 12px;
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--text);
+      }
+      .btn-action-sub:active {
+        background: var(--accent-bg);
+        color: var(--accent-text);
+      }
 
-      let timelineHtml = '';
-      if (isStacked) {
-        timer.orders.forEach((ord, index) => {
-          const isLast = (index === timer.orders.length - 1);
-          const undoBtn = isLast ? `<button class="btn-undo btn-undo-action" data-id="${timer.id}">↩ 撤銷</button>` : '';
-          
-          timelineHtml += `
+      .btn-del-suborder {
+        background: var(--danger-bg);
+        color: var(--danger);
+        border: none;
+        border-radius: 10px;
+        padding: 8px 12px;
+        font-size: 14px;
+        font-weight: 800;
+      }
+      .btn-del-suborder:active {
+        opacity: 0.8;
+      }
+
+      .btn-add-suborder {
+        width: 100%;
+        padding: 12px;
+        background: var(--card);
+        border: 2px dashed var(--border-strong);
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 800;
+        color: var(--accent);
+        margin-top: 4px;
+        transition: 0.2s;
+      }
+      .btn-add-suborder:active {
+        background: var(--accent-bg);
+        border-color: var(--accent);
+      }
+
+      /* 數字微調編輯區塊 */
+      .sub-edit-box {
+        width: 100%;
+        background: var(--card);
+        border: 2px dashed var(--accent);
+        border-radius: 10px;
+        padding: 14px;
+        margin-top: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        font-size: 16px;
+        font-weight: 700;
+      }
+      .sub-edit-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+      .time-inputs-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .time-num-input {
+        width: 68px;
+        height: 44px;
+        text-align: center;
+        font-size: 20px;
+        font-weight: 900;
+        border-radius: 8px;
+        border: 2px solid var(--border-strong);
+        background: var(--bg);
+        color: var(--text);
+      }
+      .sub-edit-btns {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        margin-top: 4px;
+      }
+      .btn-save-sub {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-size: 15px;
+        font-weight: 800;
+      }
+      .btn-cancel-sub {
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border-strong);
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-size: 15px;
+        font-weight: 800;
+      }
+
+      .hist-mid {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 2px solid var(--border);
+        padding-top: 16px;
+      }
+      .guarantee {
+        font-size: 17px;
+        color: var(--text-2);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-weight: 700;
+      }
+      .guarantee b {
+        color: var(--text);
+        font-weight: 900;
+        font-size: 24px;
+      }
+      .actual-wrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 17px;
+        color: var(--text-2);
+        font-weight: 800;
+      }
+      .actual-input {
+        width: 120px;
+        height: 54px;
+        font-size: 24px;
+        font-weight: 900;
+        text-align: center;
+      }
+
+      .status-box {
+        margin-top: 16px;
+        font-size: 17px;
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-weight: 800;
+        text-align: center;
+      }
+      .status-box.warn {
+        color: var(--danger);
+        background: var(--danger-bg);
+      }
+      .status-box.success {
+        color: var(--success);
+        background: var(--success-bg);
+      }
+
+      .empty {
+        font-size: 18px;
+        color: var(--text-3);
+        text-align: center;
+        padding: 50px 0;
+        font-weight: 700;
+      }
+
+      .summary {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .summary .card {
+        flex: 1;
+        margin-bottom: 0;
+        padding: 18px 12px;
+        text-align: center;
+      }
+      .summary .num {
+        font-size: 28px;
+        font-weight: 900;
+      }
+      .summary .lbl {
+        font-size: 15px;
+        color: var(--text-2);
+        margin-top: 6px;
+        font-weight: 700;
+      }
+
+      .btn-danger-outline {
+        width: 100%;
+        height: 60px;
+        border-radius: var(--radius);
+        border: 3px solid var(--danger);
+        background: transparent;
+        color: var(--danger);
+        font-size: 18px;
+        font-weight: 800;
+        margin-top: 36px;
+      }
+
+      .footer-section {
+        margin-top: 40px;
+        text-align: center;
+        font-size: 16px;
+        color: var(--text-2);
+        font-weight: 700;
+        line-height: 1.6;
+      }
+      .footer-section a {
+        color: var(--accent);
+        text-decoration: underline;
+      }
+      .footer-section .copyright {
+        margin-top: 8px;
+        font-size: 15px;
+        color: var(--text-3);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <button id="theme-toggle-btn" class="theme-toggle-btn" title="切換深淺色模式">🌓</button>
+
+      <h1>外送計時器 / 最低保障收入計算器</h1>
+      <p class="sub">計算方式：各單獨立計算，服務分鐘 × 時薪 × 1.25 / 60，最低 45 元</p>
+
+      <!-- 分頁 1：跑單計時 -->
+      <div id="tab-timer" class="tab-content active">
+        <details class="guide-dropdown">
+          <summary>💡 使用須知與夾單說明 <span>▾</span></summary>
+          <div class="guide-content">
+            若為同時接獲的多筆訂單，請使用「完送此單並夾單」來分開計算各單送達時間；若為行程中額外新派發的獨立夾單，則建議透過
+            "＋ 新接單" 另外建立獨立計時器。
+          </div>
+        </details>
+
+        <button class="btn-add-timer" id="create-timer-btn">＋ 新接單</button>
+
+        <div id="timers-container"></div>
+
+        <div class="notice-banner">
+          <div class="notice-title">⚠️ 使用與時間計算提醒</div>
+          <ul>
+            <li>
+              <b>工具定位：</b
+              >本計時器僅作個人時間紀錄用。由於手動操作不可能與系統完全同步，實際總金額必定有些微差別。<b
+                >建議當金額落差過大時，再來檢查是否需要跟平台反映。</b
+              >
+            </li>
+            <li>
+              <b>資料儲存：</b>本工具資料僅存於你的手機瀏覽器，不保證紀錄能永久儲存。建議每日匯出
+              CSV 備份後刪除當日紀錄。
+            </li>
+            <li>
+              <b>伺服器時差：</b
+              >本工具以「你的裝置時間」為準，平台紀錄則以「平台伺服器時間」為準，兩者可能有些許時間差。
+            </li>
+            <li>
+              <b>計算單位：</b
+              >為保證數據穩定，本工具之服務時間<b>僅以「整數分鐘」為單位</b>進行估算（未滿 30
+              秒捨去，滿 30 秒進位）；而平台系統則是以「精確秒數」等比例計算。
+            </li>
+            <li>
+              <b>免責聲明：</b
+              >本工具僅供個人紀錄與試算參考，<b>不具備法律效力或官方約束力</b>。實際結算金額與外送服務時間仍以各外送平台官方系統最終發布之數據為準。
+            </li>
+          </ul>
+          <div class="notice-footer">
+            ※ 綜合上述因素與手動點擊時間差，<b>單筆訂單</b>之計時結果與平台實際紀錄若有前後 1～2
+            分鐘落差，以及多單累積後的些許總額差異，皆屬正常現象。
+          </div>
+        </div>
+      </div>
+
+      <!-- 分頁 2：接單紀錄 -->
+      <div id="tab-history" class="tab-content">
+        <div class="section-title">
+          <h2>接單紀錄</h2>
+          <div class="header-actions">
+            <button class="link-btn" id="sort-toggle-btn" title="切換排序方式">
+              排序：新到舊 ▾
+            </button>
+            <button class="link-btn" id="settings-btn">設定時薪 ▾</button>
+          </div>
+        </div>
+
+        <div class="settings-panel" id="settings-panel">
+          <div class="settings-row">
+            <span>目前法定最低時薪</span>
+            <input type="number" id="wage-input" value="196" />
+          </div>
+        </div>
+
+        <div class="summary" id="summary" style="display: none"></div>
+        <div id="history-list"></div>
+
+        <div id="clear-all-wrap" style="display: none">
+          <button class="btn-danger-outline" id="clear-all-btn">清空所有紀錄</button>
+        </div>
+      </div>
+
+      <div class="footer-section">
+        若 app 有任何問題，請傳email到：<a href="mailto:sigismundbt.dev@gmail.com"
+          >sigismundbt.dev@gmail.com</a
+        >
+        進行回報
+        <div class="copyright">© 2026 Peyton Lu. All rights reserved.</div>
+      </div>
+    </div>
+
+    <!-- 固定底部導覽列 -->
+    <div class="bottom-nav">
+      <button class="bottom-nav-item active" data-target="tab-timer">
+        <span class="icon">⏱️</span>
+        <span>跑單計時</span>
+      </button>
+      <button class="bottom-nav-item" data-target="tab-history">
+        <span class="icon">📜</span>
+        <span>接單紀錄</span>
+      </button>
+    </div>
+
+    <script>
+      (() => {
+        const STORE_HIST = 'delivery-tracker:history';
+        const STORE_SET = 'delivery-tracker:settings';
+        const STORE_ACTIVE = 'delivery-tracker:activeTimers';
+        const STORE_LAST_DATE = 'delivery-tracker:lastActiveDate';
+        const STORE_THEME = 'delivery-tracker:theme';
+        const STORE_TAB = 'delivery-tracker:currentTab';
+
+        let wage = 196;
+        const MAX_TIMERS = 4;
+
+        let activeTimers = [];
+        let timerCounter = 0;
+        let history = [];
+        let sortOrder = 'desc';
+        let tickHandle = null;
+
+        const timersContainer = document.getElementById('timers-container');
+        const historyListEl = document.getElementById('history-list');
+        const summaryEl = document.getElementById('summary');
+        const settingsPanel = document.getElementById('settings-panel');
+        const wageInput = document.getElementById('wage-input');
+        const clearAllWrap = document.getElementById('clear-all-wrap');
+        const createTimerBtn = document.getElementById('create-timer-btn');
+        const themeBtn = document.getElementById('theme-toggle-btn');
+        const sortToggleBtn = document.getElementById('sort-toggle-btn');
+
+        // 切換底部選單 Tab 邏輯
+        const navItems = document.querySelectorAll('.bottom-nav-item');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        const switchTab = (targetId) => {
+          navItems.forEach((item) => {
+            if (item.getAttribute('data-target') === targetId) {
+              item.classList.add('active');
+            } else {
+              item.classList.remove('active');
+            }
+          });
+
+          tabContents.forEach((content) => {
+            if (content.id === targetId) {
+              content.classList.add('active');
+            } else {
+              content.classList.remove('active');
+            }
+          });
+
+          localStorage.setItem(STORE_TAB, targetId);
+        };
+
+        navItems.forEach((item) => {
+          item.addEventListener('click', () => {
+            const target = item.getAttribute('data-target');
+            switchTab(target);
+          });
+        });
+
+        const initTab = () => {
+          const savedTab = localStorage.getItem(STORE_TAB);
+          if (savedTab && document.getElementById(savedTab)) {
+            switchTab(savedTab);
+          } else {
+            switchTab('tab-timer');
+          }
+        };
+
+        const updateSortBtnText = () => {
+          sortToggleBtn.textContent = sortOrder === 'desc' ? '排序：新到舊 ▾' : '排序：舊到新 ▴';
+        };
+        updateSortBtnText();
+
+        sortToggleBtn.addEventListener('click', () => {
+          sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+          updateSortBtnText();
+          updateHistoryLabels();
+          renderHistory();
+        });
+
+        themeBtn.addEventListener('click', () => {
+          const currentTheme = localStorage.getItem(STORE_THEME);
+          let nextTheme;
+          if (currentTheme === null) {
+            nextTheme = 'light';
+            themeBtn.textContent = '☀️';
+            themeBtn.title = '目前：強制淺色（點擊切換為強制深色）';
+          } else if (currentTheme === 'light') {
+            nextTheme = 'dark';
+            themeBtn.textContent = '🌙';
+            themeBtn.title = '目前：強制深色（點擊切換為跟隨系統）';
+          } else {
+            nextTheme = null;
+            themeBtn.textContent = '🌓';
+            themeBtn.title = '目前：跟隨系統預設（點擊切換為強制淺色）';
+          }
+
+          if (nextTheme === null) {
+            document.documentElement.removeAttribute('data-theme');
+            localStorage.removeItem(STORE_THEME);
+          } else {
+            document.documentElement.setAttribute('data-theme', nextTheme);
+            localStorage.setItem(STORE_THEME, nextTheme);
+          }
+        });
+
+        const initThemeButton = () => {
+          const currentTheme = localStorage.getItem(STORE_THEME);
+          if (currentTheme === 'light') {
+            themeBtn.textContent = '☀️';
+            themeBtn.title = '目前：強制淺色（點擊切換為強制深色）';
+          } else if (currentTheme === 'dark') {
+            themeBtn.textContent = '🌙';
+            themeBtn.title = '目前：強制深色（點擊切換為跟隨系統）';
+          } else {
+            themeBtn.textContent = '🌓';
+            themeBtn.title = '目前：跟隨系統預設（點擊切換為強制淺色）';
+          }
+        };
+        initThemeButton();
+
+        const pad = (n) => (n < 10 ? `0${n}` : `${n}`);
+        const fmtClock = (sec) => {
+          const m = Math.floor(sec / 60);
+          const s = sec % 60;
+          return `${pad(m)}:${pad(s)}`;
+        };
+
+        const fmtDate = (ts) => {
+          const d = new Date(ts);
+          return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
+        };
+
+        const fmtTime = (ts) => {
+          const d = new Date(ts);
+          return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        };
+
+        const computeGuarantee = (diffSec) => {
+          let mins = Math.floor(diffSec / 60);
+          const rem = diffSec % 60;
+          if (rem >= 30) mins += 1;
+          if (mins < 1) mins = 1;
+          let amt = (mins / 60) * wage * 1.25;
+          if (amt < 45) amt = 45;
+          return { mins, amt: Math.round(amt) };
+        };
+
+        const checkDailyReset = () => {
+          const todayStr = fmtDate(Date.now());
+          const lastActiveDate = localStorage.getItem(STORE_LAST_DATE);
+
+          if (lastActiveDate !== todayStr) {
+            activeTimers = [];
+            timerCounter = 0;
+            localStorage.removeItem(STORE_ACTIVE);
+            localStorage.setItem(STORE_LAST_DATE, todayStr);
+            return true;
+          }
+          return false;
+        };
+
+        const recalculateTrip = (item) => {
+          if (!item.orders || item.orders.length === 0) return;
+
+          const tripStartTs = Math.min(...item.orders.map((o) => o.startTs));
+          item.startTs = tripStartTs;
+
+          item.orders.forEach((ord) => {
+            ord.startTs = tripStartTs;
+
+            const diffSec = Math.max(0, Math.floor((ord.endTs - ord.startTs) / 1000));
+            const g = computeGuarantee(diffSec);
+            ord.mins = g.mins;
+            ord.guaranteed = g.amt;
+          });
+
+          item.endTs = Math.max(...item.orders.map((o) => o.endTs));
+          item.mins = Math.max(1, Math.round((item.endTs - item.startTs) / 60000));
+          item.guaranteed = item.orders.reduce((sum, ord) => sum + ord.guaranteed, 0);
+        };
+
+        const updateHistoryLabels = () => {
+          const dateKeys = [...new Set(history.map((h) => fmtDate(h.startTs)))];
+
+          dateKeys.forEach((dateStr) => {
+            const items = history.filter((h) => fmtDate(h.startTs) === dateStr);
+            items.sort((a, b) => a.startTs - b.startTs);
+
+            items.forEach((item, index) => {
+              const num = index + 1;
+              const orderCount = item.orders ? item.orders.length : 1;
+              item.label =
+                orderCount > 1 ? `趟次 #${num} (夾單共 ${orderCount} 單)` : `趟次 #${num} (1 單)`;
+            });
+          });
+
+          history.sort((a, b) =>
+            sortOrder === 'desc' ? b.startTs - a.startTs : a.startTs - b.startTs
+          );
+        };
+
+        const loadState = () => {
+          const s = localStorage.getItem(STORE_SET);
+          if (s) {
+            const p = JSON.parse(s);
+            if (p.wage) wage = p.wage;
+          }
+          wageInput.value = wage;
+
+          const h = localStorage.getItem(STORE_HIST);
+          if (h) {
+            history = JSON.parse(h);
+            history.forEach((item) => {
+              recalculateTrip(item);
+            });
+            updateHistoryLabels();
+            saveHistory();
+          }
+
+          const isNewDay = checkDailyReset();
+
+          if (!isNewDay) {
+            const a = localStorage.getItem(STORE_ACTIVE);
+            if (a) {
+              activeTimers = JSON.parse(a);
+              if (activeTimers.length > 0) {
+                const maxCounter = Math.max(
+                  ...activeTimers.map((t) => parseInt(t.name.split('#')[1]) || 0)
+                );
+                timerCounter = Math.max(timerCounter, maxCounter);
+              }
+            }
+          }
+
+          initTab();
+          renderTimers();
+          renderHistory();
+          manageTick();
+        };
+
+        const saveSettings = () => localStorage.setItem(STORE_SET, JSON.stringify({ wage }));
+        const saveHistory = () => localStorage.setItem(STORE_HIST, JSON.stringify(history));
+        const saveActiveTimers = () =>
+          localStorage.setItem(STORE_ACTIVE, JSON.stringify(activeTimers));
+
+        const checkTimerLimit = () => {
+          createTimerBtn.style.display = activeTimers.length >= MAX_TIMERS ? 'none' : 'block';
+        };
+
+        const createTimer = () => {
+          if (activeTimers.length >= MAX_TIMERS) return;
+          checkDailyReset();
+
+          const activeMax =
+            activeTimers.length > 0
+              ? Math.max(...activeTimers.map((t) => parseInt(t.name.match(/#(\d+)/)?.[1]) || 0))
+              : 0;
+          const tempCounter = activeMax + 1;
+
+          const now = Date.now();
+          const timerObj = {
+            id: `t_${now}_${tempCounter}`,
+            name: `新趟次 #${tempCounter}`,
+            firstOrderStartTs: now,
+            orders: [],
+          };
+          activeTimers.push(timerObj);
+          saveActiveTimers();
+          renderTimers();
+          manageTick();
+        };
+
+        const cancelTimer = (id) => {
+          if (!window.confirm('確定要取消這個計時器嗎？\n（此操作不會留下紀錄）')) return;
+          activeTimers = activeTimers.filter((t) => t.id !== id);
+          saveActiveTimers();
+          renderTimers();
+          manageTick();
+        };
+
+        const addOrderToTimer = (id) => {
+          const timer = activeTimers.find((t) => t.id === id);
+          if (!timer) return;
+
+          const now = Date.now();
+          const diffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
+          const g = computeGuarantee(diffSec);
+          const orderNum = timer.orders.length + 1;
+
+          timer.orders.push({
+            orderNum,
+            startTs: timer.firstOrderStartTs,
+            endTs: now,
+            mins: g.mins,
+            guaranteed: g.amt,
+          });
+
+          saveActiveTimers();
+          renderTimers();
+        };
+
+        const undoLastOrder = (id) => {
+          if (!window.confirm('確定要撤銷剛才的「夾單」操作嗎？')) return;
+          const timer = activeTimers.find((t) => t.id === id);
+          if (!timer || timer.orders.length === 0) return;
+
+          timer.orders.pop();
+
+          saveActiveTimers();
+          renderTimers();
+        };
+
+        const finishTimer = (id) => {
+          const idx = activeTimers.findIndex((t) => t.id === id);
+          if (idx === -1) return;
+          const timer = activeTimers[idx];
+          const now = Date.now();
+
+          const diffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
+          const g = computeGuarantee(diffSec);
+          const finalOrderNum = timer.orders.length + 1;
+
+          const allOrders = [
+            ...timer.orders,
+            {
+              orderNum: finalOrderNum,
+              startTs: timer.firstOrderStartTs,
+              endTs: now,
+              mins: g.mins,
+              guaranteed: g.amt,
+            },
+          ];
+
+          const totalGuaranteed = allOrders.reduce((sum, ord) => sum + ord.guaranteed, 0);
+          const startTs = timer.firstOrderStartTs;
+          const endTs = now;
+
+          history.unshift({
+            id: `h${endTs}_${Math.random().toString(36).slice(2, 7)}`,
+            label: '',
+            startTs,
+            endTs,
+            orders: allOrders,
+            mins: Math.max(1, Math.round((endTs - startTs) / 60000)),
+            guaranteed: totalGuaranteed,
+            actual: null,
+          });
+
+          activeTimers.splice(idx, 1);
+          updateHistoryLabels();
+          saveActiveTimers();
+          saveHistory();
+          renderTimers();
+          renderHistory();
+          manageTick();
+        };
+
+        const deleteHistory = (id) => {
+          if (!window.confirm('確定要刪除這筆紀錄嗎？')) return;
+          history = history.filter((h) => h.id !== id);
+          updateHistoryLabels();
+          saveHistory();
+          renderHistory();
+        };
+
+        const addSubOrder = (histId) => {
+          const item = history.find((h) => h.id === histId);
+          if (!item) return;
+
+          const lastOrder = item.orders[item.orders.length - 1];
+          const defaultEndTs = lastOrder ? lastOrder.endTs : Date.now();
+          const newOrderNum = item.orders.length + 1;
+
+          item.orders.push({
+            orderNum: newOrderNum,
+            startTs: item.startTs,
+            endTs: defaultEndTs,
+            mins: 1,
+            guaranteed: 45,
+          });
+
+          recalculateTrip(item);
+          updateHistoryLabels();
+          saveHistory();
+          renderHistory();
+        };
+
+        const deleteSubOrder = (histId, orderIndex) => {
+          if (!window.confirm('確定要移除這筆夾單紀錄嗎？\n移除後將自動重新計算整趟總保障。'))
+            return;
+          const item = history.find((h) => h.id === histId);
+          if (!item || item.orders.length <= 1) {
+            alert('每趟至少需要保留一單，若整趟不要請直接刪除整筆紀錄。');
+            return;
+          }
+
+          item.orders.splice(orderIndex, 1);
+          item.orders.forEach((ord, idx) => (ord.orderNum = idx + 1));
+
+          recalculateTrip(item);
+          updateHistoryLabels();
+          saveHistory();
+          renderHistory();
+        };
+
+        const deleteDateHistory = (dateStr) => {
+          if (!window.confirm(`確定要清空 ${dateStr} 的所有紀錄嗎？`)) return;
+          history = history.filter((h) => fmtDate(h.startTs) !== dateStr);
+          saveHistory();
+          renderHistory();
+        };
+
+        const exportDateCsv = (dateStr) => {
+          const itemsForDate = history.filter((h) => fmtDate(h.startTs) === dateStr);
+          if (itemsForDate.length === 0) {
+            alert('此日無資料可匯出');
+            return;
+          }
+          itemsForDate.sort((a, b) => a.startTs - b.startTs);
+
+          let rows = [
+            [
+              '日期',
+              '趟次編號',
+              '總單數',
+              '夾單明細',
+              '總耗時(分)',
+              '整趟總保障(元)',
+              '整趟實拿(元)',
+            ],
+          ];
+
+          itemsForDate.forEach((h, index) => {
+            const tripNum = `趟次 #${index + 1}`;
+            const totalOrders = `${h.orders.length}單`;
+
+            const detailsStr = h.orders
+              .map(
+                (o) =>
+                  `第${o.orderNum}單(${fmtTime(o.startTs)}-${fmtTime(o.endTs)}/${o.mins}分/$${o.guaranteed})`
+              )
+              .join('\n');
+
+            const actualVal = h.actual !== null ? h.actual : '';
+
+            rows.push([dateStr, tripNum, totalOrders, detailsStr, h.mins, h.guaranteed, actualVal]);
+          });
+
+          let csvContent = rows
+            .map((e) => e.map((field) => `"${String(field).replace(/"/g, '""')}"`).join(','))
+            .join('\r\n');
+
+          const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `外送保障明細_${dateStr.replace(/\//g, '-')}.csv`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        };
+
+        const clearAllHistory = () => {
+          if (!window.confirm('確定要清空所有的「歷史紀錄」嗎？\n請確認資料已抄錄完成！')) return;
+          history = [];
+          saveHistory();
+          renderHistory();
+        };
+
+        const renderTimers = () => {
+          timersContainer.innerHTML = '';
+
+          activeTimers.forEach((timer) => {
+            const now = Date.now();
+            const totalDiffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
+            const currentDiffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
+            const currentG = computeGuarantee(currentDiffSec);
+            const stackedGuaranteed = timer.orders.reduce((sum, ord) => sum + ord.guaranteed, 0);
+            const totalGuaranteeVisual = stackedGuaranteed + currentG.amt;
+
+            const totalOrdersCount = timer.orders.length + 1;
+            const isStacked = timer.orders.length > 0;
+
+            let timelineHtml = '';
+            if (isStacked) {
+              timer.orders.forEach((ord, index) => {
+                const isLast = index === timer.orders.length - 1;
+                const undoBtn = isLast
+                  ? `<button class="btn-undo btn-undo-action" data-id="${timer.id}">↩ 撤銷</button>`
+                  : '';
+
+                timelineHtml += `
             <div class="timeline-item">
               <div>
                 <strong>第 ${ord.orderNum} 單</strong> <span style="font-size:15px; color:var(--text-2);">(${fmtTime(ord.startTs)}–${fmtTime(ord.endTs)})</span><br>
@@ -810,13 +1492,13 @@
               ${undoBtn}
             </div>
           `;
-        });
-        timelineHtml = `<div class="order-timeline">${timelineHtml}</div>`;
-      }
+              });
+              timelineHtml = `<div class="order-timeline">${timelineHtml}</div>`;
+            }
 
-      const card = document.createElement('div');
-      card.className = 'timer-card';
-      card.innerHTML = `
+            const card = document.createElement('div');
+            card.className = 'timer-card';
+            card.innerHTML = `
         <div class="timer-head">
           <div class="timer-title-wrap">
             <span class="timer-title">${timer.name}</span>
@@ -838,132 +1520,139 @@
         </div>
       `;
 
-      timersContainer.appendChild(card);
+            timersContainer.appendChild(card);
 
-      card.querySelector('.btn-cancel-timer').addEventListener('click', () => cancelTimer(timer.id));
-      card.querySelector('.btn-continue').addEventListener('click', () => addOrderToTimer(timer.id));
-      card.querySelector('.btn-finish').addEventListener('click', () => finishTimer(timer.id));
+            card
+              .querySelector('.btn-cancel-timer')
+              .addEventListener('click', () => cancelTimer(timer.id));
+            card
+              .querySelector('.btn-continue')
+              .addEventListener('click', () => addOrderToTimer(timer.id));
+            card
+              .querySelector('.btn-finish')
+              .addEventListener('click', () => finishTimer(timer.id));
 
-      if (isStacked) {
-        card.querySelectorAll('.btn-undo-action').forEach(btn => {
-          btn.addEventListener('click', ev => {
-            undoLastOrder(ev.target.getAttribute('data-id'));
+            if (isStacked) {
+              card.querySelectorAll('.btn-undo-action').forEach((btn) => {
+                btn.addEventListener('click', (ev) => {
+                  undoLastOrder(ev.target.getAttribute('data-id'));
+                });
+              });
+            }
+
+            card._ref = timer;
+            card._clockEl = card.querySelector('.t');
+            card._gEl = card.querySelector('.g-amt');
           });
-        });
-      }
 
-      card._ref = timer;
-      card._clockEl = card.querySelector('.t');
-      card._gEl = card.querySelector('.g-amt');
-    });
-    
-    checkTimerLimit(); 
-  };
+          checkTimerLimit();
+        };
 
-  const manageTick = () => {
-    const needed = activeTimers.length > 0;
-    if (needed && !tickHandle) tickHandle = setInterval(tick, 1000);
-    if (!needed && tickHandle) {
-      clearInterval(tickHandle);
-      tickHandle = null;
-    }
-    if (needed) tick();
-  };
+        const manageTick = () => {
+          const needed = activeTimers.length > 0;
+          if (needed && !tickHandle) tickHandle = setInterval(tick, 1000);
+          if (!needed && tickHandle) {
+            clearInterval(tickHandle);
+            tickHandle = null;
+          }
+          if (needed) tick();
+        };
 
-  const tick = () => {
-    const cards = timersContainer.children;
-    for (let i = 0; i < cards.length; i++) {
-      const card = cards[i];
-      const timer = card._ref;
-      const now = Date.now();
-      
-      const totalDiffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
-      const currentDiffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
-      const currentG = computeGuarantee(currentDiffSec);
-      const stackedGuaranteed = timer.orders.reduce((sum, ord) => sum + ord.guaranteed, 0);
-      const totalGuaranteeVisual = stackedGuaranteed + currentG.amt;
-      
-      card._clockEl.textContent = fmtClock(totalDiffSec);
-      card._gEl.textContent = totalGuaranteeVisual;
-    }
-  };
+        const tick = () => {
+          const cards = timersContainer.children;
+          for (let i = 0; i < cards.length; i++) {
+            const card = cards[i];
+            const timer = card._ref;
+            const now = Date.now();
 
-  const renderHistory = () => {
-    if (history.length === 0) {
-      summaryEl.style.display = 'none';
-      clearAllWrap.style.display = 'none';
-      historyListEl.innerHTML = '<div class="empty">還沒有紀錄，切換至「跑單計時」開啟新接單</div>';
-      return;
-    }
-    
-    let shortfallCount = 0;
-    let shortfallSum = 0;
-    
-    history.forEach(h => {
-      if (h.actual !== null && h.actual < h.guaranteed) { 
-        shortfallCount += 1; 
-        shortfallSum += (h.guaranteed - h.actual); 
-      }
-    });
+            const totalDiffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
+            const currentDiffSec = Math.floor((now - timer.firstOrderStartTs) / 1000);
+            const currentG = computeGuarantee(currentDiffSec);
+            const stackedGuaranteed = timer.orders.reduce((sum, ord) => sum + ord.guaranteed, 0);
+            const totalGuaranteeVisual = stackedGuaranteed + currentG.amt;
 
-    summaryEl.style.display = 'flex';
-    clearAllWrap.style.display = 'block';
-    summaryEl.innerHTML = `
+            card._clockEl.textContent = fmtClock(totalDiffSec);
+            card._gEl.textContent = totalGuaranteeVisual;
+          }
+        };
+
+        const renderHistory = () => {
+          if (history.length === 0) {
+            summaryEl.style.display = 'none';
+            clearAllWrap.style.display = 'none';
+            historyListEl.innerHTML =
+              '<div class="empty">還沒有紀錄，切換至「跑單計時」開啟新接單</div>';
+            return;
+          }
+
+          let shortfallCount = 0;
+          let shortfallSum = 0;
+
+          history.forEach((h) => {
+            if (h.actual !== null && h.actual < h.guaranteed) {
+              shortfallCount += 1;
+              shortfallSum += h.guaranteed - h.actual;
+            }
+          });
+
+          summaryEl.style.display = 'flex';
+          clearAllWrap.style.display = 'block';
+          summaryEl.innerHTML = `
       <div class="card"><div class="num">${history.length}</div><div class="lbl">累計趟數</div></div>
       <div class="card"><div class="num" style="${shortfallCount > 0 ? 'color:var(--danger)' : ''}">${shortfallCount}</div><div class="lbl">需補貼趟數</div></div>
       <div class="card"><div class="num" style="${shortfallSum > 0 ? 'color:var(--danger)' : ''}">${shortfallSum}</div><div class="lbl">平台總共應補 (元)</div></div>
     `;
 
-    historyListEl.innerHTML = '';
-    
-    const dateKeys = [...new Set(history.map(h => fmtDate(h.startTs)))];
+          historyListEl.innerHTML = '';
 
-    dateKeys.forEach(dateStr => {
-      const itemsForDate = history.filter(h => fmtDate(h.startTs) === dateStr);
+          const dateKeys = [...new Set(history.map((h) => fmtDate(h.startTs)))];
 
-      let dateTotalGuaranteed = 0;
-      let dateTotalActual = 0;
-      let dateTotalShortfall = 0;
-      let dateTotalMins = 0;
-      let hasAnyActualFilled = false;
+          dateKeys.forEach((dateStr) => {
+            const itemsForDate = history.filter((h) => fmtDate(h.startTs) === dateStr);
 
-      itemsForDate.forEach(h => {
-        dateTotalGuaranteed += h.guaranteed;
-        dateTotalMins += parseInt(h.mins) || 0;
-        if (h.actual !== null) {
-          hasAnyActualFilled = true;
-          dateTotalActual += h.actual;
-          if (h.actual < h.guaranteed) {
-            dateTotalShortfall += (h.guaranteed - h.actual);
-          }
-        }
-      });
+            let dateTotalGuaranteed = 0;
+            let dateTotalActual = 0;
+            let dateTotalShortfall = 0;
+            let dateTotalMins = 0;
+            let hasAnyActualFilled = false;
 
-      const dateSection = document.createElement('div');
-      dateSection.className = 'date-section';
+            itemsForDate.forEach((h) => {
+              dateTotalGuaranteed += h.guaranteed;
+              dateTotalMins += parseInt(h.mins) || 0;
+              if (h.actual !== null) {
+                hasAnyActualFilled = true;
+                dateTotalActual += h.actual;
+                if (h.actual < h.guaranteed) {
+                  dateTotalShortfall += h.guaranteed - h.actual;
+                }
+              }
+            });
 
-      const headerEl = document.createElement('div');
-      headerEl.className = 'date-header';
-      headerEl.innerHTML = `
+            const dateSection = document.createElement('div');
+            dateSection.className = 'date-section';
+
+            const headerEl = document.createElement('div');
+            headerEl.className = 'date-header';
+            headerEl.innerHTML = `
         <span class="d-title">${dateStr}</span>
         <div style="display:flex; gap:8px; align-items:center;">
           <button class="btn-export-csv" data-date="${dateStr}" style="background:var(--accent-bg); color:var(--accent-text); border:1px solid var(--accent); border-radius:8px; padding:6px 12px; font-size:15px; font-weight:750; cursor:pointer;">📥 匯出本日 CSV</button>
           <button class="btn-del-date" data-date="${dateStr}" style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger); border-radius:8px; padding:6px 12px; font-size:15px; font-weight:750; cursor:pointer;">🗑️ 刪除本日記錄</button>
         </div>
       `;
-      dateSection.appendChild(headerEl);
-      
-      headerEl.querySelector('.btn-del-date').addEventListener('click', ev => {
-        deleteDateHistory(ev.target.getAttribute('data-date'));
-      });
+            dateSection.appendChild(headerEl);
 
-      headerEl.querySelector('.btn-export-csv').addEventListener('click', ev => {
-        exportDateCsv(ev.target.getAttribute('data-date'));
-      });
+            headerEl.querySelector('.btn-del-date').addEventListener('click', (ev) => {
+              deleteDateHistory(ev.target.getAttribute('data-date'));
+            });
 
-      const dateSummaryBox = document.createElement('div');
-      dateSummaryBox.className = 'date-summary-box';
-      dateSummaryBox.innerHTML = `
+            headerEl.querySelector('.btn-export-csv').addEventListener('click', (ev) => {
+              exportDateCsv(ev.target.getAttribute('data-date'));
+            });
+
+            const dateSummaryBox = document.createElement('div');
+            dateSummaryBox.className = 'date-summary-box';
+            dateSummaryBox.innerHTML = `
         <div style="font-size:18px; font-weight:900; color:var(--text); border-bottom: 2px solid var(--border); padding-bottom:10px; margin-bottom:12px;">
           當日總工作時間：${dateTotalMins} 分鐘
         </div>
@@ -973,28 +1662,28 @@
           <span style="color:${dateTotalShortfall > 0 ? 'var(--danger)' : 'var(--text-2)'};">應補貼：<b style="font-size:19px;">$${dateTotalShortfall}</b></span>
         </div>
       `;
-      dateSection.appendChild(dateSummaryBox);
+            dateSection.appendChild(dateSummaryBox);
 
-      itemsForDate.forEach(h => {
-        const el = document.createElement('div');
-        el.className = 'hist-item';
-        
-        let statusHtml = '';
-        if (h.actual !== null) {
-          if (h.actual < h.guaranteed) {
-            statusHtml = `<div class="status-box warn">💰 平台應補 ${h.guaranteed - h.actual} 元</div>`;
-          } else {
-            const extra = h.actual - h.guaranteed;
-            statusHtml = `<div class="status-box success">✅ 達標！${extra > 0 ? `額外多賺 ${extra} 元` : '剛好符合保障'}</div>`;
-          }
-        }
-          
-        const actualVal = h.actual === null ? '' : h.actual;
+            itemsForDate.forEach((h) => {
+              const el = document.createElement('div');
+              el.className = 'hist-item';
 
-        let subCardsHtml = '';
-        if (h.orders && h.orders.length > 0) {
-          h.orders.forEach((o, oIdx) => {
-            subCardsHtml += `
+              let statusHtml = '';
+              if (h.actual !== null) {
+                if (h.actual < h.guaranteed) {
+                  statusHtml = `<div class="status-box warn">💰 平台應補 ${h.guaranteed - h.actual} 元</div>`;
+                } else {
+                  const extra = h.actual - h.guaranteed;
+                  statusHtml = `<div class="status-box success">✅ 達標！${extra > 0 ? `額外多賺 ${extra} 元` : '剛好符合保障'}</div>`;
+                }
+              }
+
+              const actualVal = h.actual === null ? '' : h.actual;
+
+              let subCardsHtml = '';
+              if (h.orders && h.orders.length > 0) {
+                h.orders.forEach((o, oIdx) => {
+                  subCardsHtml += `
               <div class="hist-sub-card" data-sub-container="${h.id}_${oIdx}">
                 <div class="hist-sub-left">
                   <span class="hist-sub-tag">第 ${o.orderNum} 單</span>
@@ -1010,10 +1699,10 @@
                 </div>
               </div>
             `;
-          });
-        }
+                });
+              }
 
-        el.innerHTML = `
+              el.innerHTML = `
           <div class="hist-head-row">
             <div class="hist-title">${h.label}</div>
             <button class="btn-hist-x" data-id="${h.id}" title="刪除此筆紀錄">✕</button>
@@ -1038,48 +1727,50 @@
           </div>
           ${statusHtml}
         `;
-          
-        dateSection.appendChild(el);
-        
-        el.querySelector('.actual-input').addEventListener('change', ev => {
-          const id = ev.target.getAttribute('data-id');
-          const v = ev.target.value;
-          const item = history.find(x => x.id === id);
-          if (item) {
-            item.actual = (v.trim() === '' || isNaN(parseFloat(v))) ? null : Math.round(parseFloat(v));
-            saveHistory(); 
-            renderHistory();
-          }
-        });
-        
-        el.querySelector('.btn-hist-x').addEventListener('click', ev => {
-          deleteHistory(ev.target.getAttribute('data-id'));
-        });
 
-        el.querySelector('.btn-add-suborder').addEventListener('click', ev => {
-          const hid = ev.target.getAttribute('data-hid');
-          addSubOrder(hid);
-        });
+              dateSection.appendChild(el);
 
-        // 綁定「修改」按鈕事件
-        el.querySelectorAll('.btn-edit-sub').forEach(editBtn => {
-          editBtn.addEventListener('click', ev => {
-            const hid = ev.target.getAttribute('data-hid');
-            const oidx = parseInt(ev.target.getAttribute('data-oidx'), 10);
-            const item = history.find(x => x.id === hid);
-            const ord = item.orders[oidx];
+              el.querySelector('.actual-input').addEventListener('change', (ev) => {
+                const id = ev.target.getAttribute('data-id');
+                const v = ev.target.value;
+                const item = history.find((x) => x.id === id);
+                if (item) {
+                  item.actual =
+                    v.trim() === '' || isNaN(parseFloat(v)) ? null : Math.round(parseFloat(v));
+                  saveHistory();
+                  renderHistory();
+                }
+              });
 
-            const subCardEl = el.querySelector(`[data-sub-container="${hid}_${oidx}"]`);
-            if (subCardEl.querySelector('.sub-edit-box')) return;
+              el.querySelector('.btn-hist-x').addEventListener('click', (ev) => {
+                deleteHistory(ev.target.getAttribute('data-id'));
+              });
 
-            const startDate = new Date(item.startTs);
-            const endDate = new Date(ord.endTs);
-            const isFirstOrder = (oidx === 0);
+              el.querySelector('.btn-add-suborder').addEventListener('click', (ev) => {
+                const hid = ev.target.getAttribute('data-hid');
+                addSubOrder(hid);
+              });
 
-            const editBox = document.createElement('div');
-            editBox.className = 'sub-edit-box';
+              // 綁定「修改」按鈕事件
+              el.querySelectorAll('.btn-edit-sub').forEach((editBtn) => {
+                editBtn.addEventListener('click', (ev) => {
+                  const hid = ev.target.getAttribute('data-hid');
+                  const oidx = parseInt(ev.target.getAttribute('data-oidx'), 10);
+                  const item = history.find((x) => x.id === hid);
+                  const ord = item.orders[oidx];
 
-            const startRowHtml = isFirstOrder ? `
+                  const subCardEl = el.querySelector(`[data-sub-container="${hid}_${oidx}"]`);
+                  if (subCardEl.querySelector('.sub-edit-box')) return;
+
+                  const startDate = new Date(item.startTs);
+                  const endDate = new Date(ord.endTs);
+                  const isFirstOrder = oidx === 0;
+
+                  const editBox = document.createElement('div');
+                  editBox.className = 'sub-edit-box';
+
+                  const startRowHtml = isFirstOrder
+                    ? `
               <div class="sub-edit-row">
                 <span>整趟開始時間：</span>
                 <div class="time-inputs-group">
@@ -1088,13 +1779,14 @@
                   <input type="number" class="time-num-input edit-start-m" value="${startDate.getMinutes()}" min="0" max="59" placeholder="分">
                 </div>
               </div>
-            ` : `
+            `
+                    : `
               <div class="sub-edit-row" style="font-size:14px; color:var(--text-3);">
                 <span>整趟起點：${fmtTime(item.startTs)}（夾單共用，如需調整請至第 1 單）</span>
               </div>
             `;
 
-            editBox.innerHTML = `
+                  editBox.innerHTML = `
               ${startRowHtml}
               <div class="sub-edit-row">
                 <span>本單結束時間：</span>
@@ -1109,94 +1801,113 @@
                 <button class="btn-save-sub">確定修改</button>
               </div>
             `;
-            subCardEl.appendChild(editBox);
+                  subCardEl.appendChild(editBox);
 
-            editBox.querySelector('.btn-cancel-sub').addEventListener('click', () => {
-              editBox.remove();
+                  editBox.querySelector('.btn-cancel-sub').addEventListener('click', () => {
+                    editBox.remove();
+                  });
+
+                  editBox.querySelector('.btn-save-sub').addEventListener('click', () => {
+                    const endH = parseInt(editBox.querySelector('.edit-end-h').value, 10);
+                    const endM = parseInt(editBox.querySelector('.edit-end-m').value, 10);
+
+                    if (isNaN(endH) || isNaN(endM)) {
+                      alert('請完整填寫時間數字');
+                      return;
+                    }
+
+                    if (endH < 0 || endH > 23 || endM < 0 || endM > 59) {
+                      alert('時間數值超出範圍（時 0-23，分 0-59）');
+                      return;
+                    }
+
+                    let newStartTs = item.startTs;
+
+                    if (isFirstOrder) {
+                      const startH = parseInt(editBox.querySelector('.edit-start-h').value, 10);
+                      const startM = parseInt(editBox.querySelector('.edit-start-m').value, 10);
+
+                      if (
+                        isNaN(startH) ||
+                        isNaN(startM) ||
+                        startH < 0 ||
+                        startH > 23 ||
+                        startM < 0 ||
+                        startM > 59
+                      ) {
+                        alert('開始時間數值不正確');
+                        return;
+                      }
+
+                      const baseStartDate = new Date(item.startTs);
+                      newStartTs = new Date(
+                        baseStartDate.getFullYear(),
+                        baseStartDate.getMonth(),
+                        baseStartDate.getDate(),
+                        startH,
+                        startM
+                      ).getTime();
+                    }
+
+                    const baseEndDate = new Date(ord.endTs);
+                    const newEndTs = new Date(
+                      baseEndDate.getFullYear(),
+                      baseEndDate.getMonth(),
+                      baseEndDate.getDate(),
+                      endH,
+                      endM
+                    ).getTime();
+
+                    if (newEndTs <= newStartTs) {
+                      alert('結束時間必須大於開始時間！');
+                      return;
+                    }
+
+                    if (isFirstOrder) {
+                      item.startTs = newStartTs;
+                      item.orders.forEach((o) => (o.startTs = newStartTs));
+                    }
+
+                    ord.endTs = newEndTs;
+
+                    recalculateTrip(item);
+                    updateHistoryLabels();
+                    saveHistory();
+                    renderHistory();
+                  });
+                });
+              });
+
+              el.querySelectorAll('.btn-del-suborder').forEach((subBtn) => {
+                subBtn.addEventListener('click', (ev) => {
+                  const hid = ev.target.getAttribute('data-hid');
+                  const oidx = parseInt(ev.target.getAttribute('data-oidx'), 10);
+                  deleteSubOrder(hid, oidx);
+                });
+              });
             });
 
-            editBox.querySelector('.btn-save-sub').addEventListener('click', () => {
-              const endH = parseInt(editBox.querySelector('.edit-end-h').value, 10);
-              const endM = parseInt(editBox.querySelector('.edit-end-m').value, 10);
-
-              if (isNaN(endH) || isNaN(endM)) {
-                alert('請完整填寫時間數字');
-                return;
-              }
-
-              if (endH < 0 || endH > 23 || endM < 0 || endM > 59) {
-                alert('時間數值超出範圍（時 0-23，分 0-59）');
-                return;
-              }
-
-              let newStartTs = item.startTs;
-
-              if (isFirstOrder) {
-                const startH = parseInt(editBox.querySelector('.edit-start-h').value, 10);
-                const startM = parseInt(editBox.querySelector('.edit-start-m').value, 10);
-
-                if (isNaN(startH) || isNaN(startM) || startH < 0 || startH > 23 || startM < 0 || startM > 59) {
-                  alert('開始時間數值不正確');
-                  return;
-                }
-
-                const baseStartDate = new Date(item.startTs);
-                newStartTs = new Date(baseStartDate.getFullYear(), baseStartDate.getMonth(), baseStartDate.getDate(), startH, startM).getTime();
-              }
-
-              const baseEndDate = new Date(ord.endTs);
-              const newEndTs = new Date(baseEndDate.getFullYear(), baseEndDate.getMonth(), baseEndDate.getDate(), endH, endM).getTime();
-
-              if (newEndTs <= newStartTs) {
-                alert('結束時間必須大於開始時間！');
-                return;
-              }
-
-              if (isFirstOrder) {
-                item.startTs = newStartTs;
-                item.orders.forEach(o => o.startTs = newStartTs);
-              }
-
-              ord.endTs = newEndTs;
-
-              recalculateTrip(item);
-              updateHistoryLabels();
-              saveHistory();
-              renderHistory();
-            });
+            historyListEl.appendChild(dateSection);
           });
+        };
+
+        createTimerBtn.addEventListener('click', createTimer);
+        clearAllWrap.querySelector('#clear-all-btn').addEventListener('click', clearAllHistory);
+        document.getElementById('settings-btn').addEventListener('click', () => {
+          settingsPanel.classList.toggle('open');
         });
 
-        el.querySelectorAll('.btn-del-suborder').forEach(subBtn => {
-          subBtn.addEventListener('click', ev => {
-            const hid = ev.target.getAttribute('data-hid');
-            const oidx = parseInt(ev.target.getAttribute('data-oidx'), 10);
-            deleteSubOrder(hid, oidx);
-          });
+        wageInput.addEventListener('change', () => {
+          const v = parseFloat(wageInput.value);
+          if (!isNaN(v) && v > 0) {
+            wage = v;
+            saveSettings();
+            tick();
+          }
         });
-      });
 
-      historyListEl.appendChild(dateSection);
-    });
-  };
-
-  createTimerBtn.addEventListener('click', createTimer);
-  clearAllWrap.querySelector('#clear-all-btn').addEventListener('click', clearAllHistory);
-  document.getElementById('settings-btn').addEventListener('click', () => {
-    settingsPanel.classList.toggle('open'); 
-  });
-  
-  wageInput.addEventListener('change', () => {
-    const v = parseFloat(wageInput.value);
-    if (!isNaN(v) && v > 0) { 
-      wage = v; 
-      saveSettings(); 
-      tick(); 
-    }
-  });
-
-  loadState();
-})();
-</script>
-</body>
+        loadState();
+      })();
+    </script>
+  </body>
 </html>
