@@ -1419,12 +1419,17 @@
           }
           itemsForDate.sort((a, b) => a.startTs - b.startTs);
 
+          // 表頭包含總耗時與整趟總保障，並將時間欄位展開
           let rows = [
             [
               '日期',
               '趟次編號',
               '總單數',
-              '夾單明細',
+              '本趟開始時間',
+              '第一單結束時間',
+              '第二單結束時間',
+              '第三單結束時間',
+              '第四單結束時間',
               '總耗時(分)',
               '整趟總保障(元)',
               '整趟實拿(元)',
@@ -1435,28 +1440,40 @@
             const tripNum = `趟次 #${index + 1}`;
             const totalOrders = `${h.orders.length}單`;
 
-            const detailsStr = h.orders
-              .map(
-                (o) =>
-                  `第${o.orderNum}單(${fmtTime(o.startTs)}-${fmtTime(o.endTs)}/${o.mins}分/$${o.guaranteed})`
-              )
-              .join('\n');
+            // 各單結束時間提取（ISO 格式 YYYY-MM-DD HH:mm:ss）
+            const end1 = h.orders && h.orders[0] ? fmtIsoTime(h.orders[0].endTs) : '';
+            const end2 = h.orders && h.orders[1] ? fmtIsoTime(h.orders[1].endTs) : '';
+            const end3 = h.orders && h.orders[2] ? fmtIsoTime(h.orders[2].endTs) : '';
+            const end4 = h.orders && h.orders[3] ? fmtIsoTime(h.orders[3].endTs) : '';
 
             const actualVal = h.actual !== null ? h.actual : '';
 
-            rows.push([dateStr, tripNum, totalOrders, detailsStr, h.mins, h.guaranteed, actualVal]);
+            rows.push([
+              dateStr,
+              tripNum,
+              totalOrders,
+              fmtIsoTime(h.startTs), // 本趟開始時間
+              end1,
+              end2,
+              end3,
+              end4,
+              h.mins, // 總耗時(分)
+              h.guaranteed, // 整趟總保障(元)
+              actualVal, // 整趟實拿(元)
+            ]);
           });
 
           let csvContent = rows
             .map((e) => e.map((field) => `"${String(field).replace(/"/g, '""')}"`).join(','))
             .join('\r\n');
 
+          // 加上 '\uFEFF' BOM 標記，讓其他人用 Excel 雙擊開啟時能正常顯示繁體中文不亂碼
           const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
           const url = URL.createObjectURL(blob);
 
           const link = document.createElement('a');
           link.href = url;
-          link.download = `外送保障明細_${dateStr.replace(/\//g, '-')}.csv`;
+          link.download = `外送明細_${dateStr.replace(/\//g, '-')}.csv`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
@@ -1515,7 +1532,7 @@
 
           const link = document.createElement('a');
           link.href = url;
-          link.download = `Notion匯入_外送紀錄_${dateStr.replace(/\//g, '-')}.csv`;
+          link.download = `Notion用外送明細_${dateStr.replace(/\//g, '-')}.csv`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
