@@ -543,6 +543,8 @@
         margin: 20px 0 12px 4px;
         padding-bottom: 10px;
         border-bottom: 3px solid var(--border-strong);
+        flex-wrap: wrap;
+        gap: 10px;
       }
       .date-header .d-title {
         font-size: 22px;
@@ -1128,6 +1130,12 @@
           return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
         };
 
+        const fmtIsoTime = (ts) => {
+          if (!ts) return '';
+          const d = new Date(ts);
+          return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        };
+
         const computeGuarantee = (diffSec) => {
           let mins = Math.floor(diffSec / 60);
           const rem = diffSec % 60;
@@ -1455,6 +1463,65 @@
           URL.revokeObjectURL(url);
         };
 
+        const exportNotionCsv = (dateStr) => {
+          const itemsForDate = history.filter((h) => fmtDate(h.startTs) === dateStr);
+          if (itemsForDate.length === 0) {
+            alert('此日無資料可匯出');
+            return;
+          }
+          itemsForDate.sort((a, b) => a.startTs - b.startTs);
+
+          let rows = [
+            [
+              '趟次',
+              '本趟開始時間',
+              '本趟訂單金額',
+              '第一單結束時間',
+              '第二單結束時間',
+              '第三單結束時間',
+              '第四單結束時間',
+              '存檔狀態',
+              '設置',
+            ],
+          ];
+
+          itemsForDate.forEach((h, index) => {
+            const end1 = h.orders && h.orders[0] ? fmtIsoTime(h.orders[0].endTs) : '';
+            const end2 = h.orders && h.orders[1] ? fmtIsoTime(h.orders[1].endTs) : '';
+            const end3 = h.orders && h.orders[2] ? fmtIsoTime(h.orders[2].endTs) : '';
+            const end4 = h.orders && h.orders[3] ? fmtIsoTime(h.orders[3].endTs) : '';
+
+            const actualVal = h.actual !== null ? h.actual : 0;
+
+            rows.push([
+              '',
+              fmtIsoTime(h.startTs),
+              actualVal,
+              end1,
+              end2,
+              end3,
+              end4,
+              '未存檔',
+              '設定檔',
+            ]);
+          });
+
+          let csvContent = rows
+            .map((e) => e.map((field) => `"${String(field).replace(/"/g, '""')}"`).join(','))
+            .join('\r\n');
+
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `Notion匯入_外送紀錄_${dateStr.replace(/\//g, '-')}.csv`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        };
+
         const clearAllHistory = () => {
           if (!window.confirm('確定要清空所有的「歷史紀錄」嗎？\n請確認資料已抄錄完成！')) return;
           history = [];
@@ -1636,8 +1703,9 @@
             headerEl.className = 'date-header';
             headerEl.innerHTML = `
         <span class="d-title">${dateStr}</span>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <button class="btn-export-csv" data-date="${dateStr}" style="background:var(--accent-bg); color:var(--accent-text); border:1px solid var(--accent); border-radius:8px; padding:6px 12px; font-size:15px; font-weight:750; cursor:pointer;">📥 匯出本日 CSV</button>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <button class="btn-export-notion-csv" data-date="${dateStr}" style="background:var(--accent-bg); color:var(--accent-text); border:1px solid var(--accent); border-radius:8px; padding:6px 12px; font-size:15px; font-weight:750; cursor:pointer;">📥 匯出 Notion CSV</button>
+          <button class="btn-export-csv" data-date="${dateStr}" style="background:var(--accent-bg); color:var(--accent-text); border:1px solid var(--accent); border-radius:8px; padding:6px 12px; font-size:15px; font-weight:750; cursor:pointer;">📥 匯出標準 CSV</button>
           <button class="btn-del-date" data-date="${dateStr}" style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger); border-radius:8px; padding:6px 12px; font-size:15px; font-weight:750; cursor:pointer;">🗑️ 刪除本日記錄</button>
         </div>
       `;
@@ -1649,6 +1717,10 @@
 
             headerEl.querySelector('.btn-export-csv').addEventListener('click', (ev) => {
               exportDateCsv(ev.target.getAttribute('data-date'));
+            });
+
+            headerEl.querySelector('.btn-export-notion-csv').addEventListener('click', (ev) => {
+              exportNotionCsv(ev.target.getAttribute('data-date'));
             });
 
             const dateSummaryBox = document.createElement('div');
